@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Ingresar Alumno{% endblock %}
+{% block content %}
+<h2>Registrar datos faciales de alumnos</h2>
+
+<table>
+    <tr>
+        <th>Nombre</th>
+        <th>RUT</th>
+        <th>Opciones</th>
+    </tr>
+    {% for alumno in alumnos %}
+    <tr>
+        <td>{{ alumno.nombre }}</td>
+        <td>{{ alumno.rut }}</td>
+        <td>
+            <!-- Botón para activar la cámara -->
+            <button onclick="activarCamara('{{ alumno.id }}')">Cámara</button>
+            <!-- Botón para subir foto -->
+            <form action="{{ url_for('main.ingresar_alumno', clase_id=clase_id) }}" method="post" enctype="multipart/form-data" style="display:inline;">
+                <input type="file" name="foto_{{ alumno.id }}" accept="image/*" style="display:none;" onchange="this.form.submit()">
+                <button type="button" onclick="this.previousElementSibling.click();">Subir foto</button>
+            </form>
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+
+<!-- Modal o espacio para la cámara -->
+<div id="modalCamara" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.7); text-align:center;">
+    <div style="background:#fff; margin:5% auto; padding:20px; width:420px; border-radius:8px; position:relative;">
+        <span style="position:absolute; top:10px; right:20px; cursor:pointer; font-size:20px;" onclick="cerrarCamara()">&times;</span>
+        <h3>Capturar foto del alumno</h3>
+        <video id="video" width="400" height="300" autoplay style="border:1px solid #ccc;"></video>
+        <canvas id="canvas" width="400" height="300" style="display:none;"></canvas>
+        <br>
+        <button id="capturarBtn" onclick="capturarFoto()">Capturar</button>
+    </div>
+</div>
+
+<script>
+    let alumnoIdSeleccionado = null;
+
+    function activarCamara(alumnoId) {
+        alumnoIdSeleccionado = alumnoId;
+        document.getElementById('modalCamara').style.display = 'block';
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(function(stream) {
+                    const video = document.getElementById('video');
+                    video.srcObject = stream;
+                    video.play();
+                })
+                .catch(function(err) {
+                    alert('No se pudo acceder a la cámara.');
+                });
+        }
+    }
+    
+    function cerrarCamara() {
+        document.getElementById('modalCamara').style.display = 'none';
+        const video = document.getElementById('video');
+        if (video && video.srcObject) {
+            video.srcObject.getTracks().forEach(track => track.stop());
+            video.srcObject = null;
+        }
+    }
+
+    function capturarFoto() {
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const context = canvas.getContext('2d');
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // Convertir la imagen a Base64
+        const imagenBase64 = canvas.toDataURL('image/png');
+
+        // Enviar la imagen al backend
+        fetch(`/capturar_foto/${alumnoIdSeleccionado}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ imagen: imagenBase64 })
+        })
+        .then(response => response.json())
+        .then(data => {
+            alert(data.mensaje);
+            cerrarCamara();
+        })
+        .catch(error => {
+            console.error('Error al capturar la foto:', error);
+            alert('Ocurrió un error al capturar la foto.');
+        });
+    }
+</script>
+{% endblock %}

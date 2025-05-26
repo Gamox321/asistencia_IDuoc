@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Asistencia{% endblock %}
+{% block content %}
+<h2>Registrar asistencia</h2>
+
+<!-- Espacio para la cámara -->
+<div style="text-align:center;">
+    <video id="video" width="400" height="300" autoplay style="border:1px solid #ccc;"></video>
+    <br>
+</div>
+
+<h3>Alumnos del curso</h3>
+<table>
+    <tr>
+        <th>Nombre</th>
+        <th>RUT</th>
+        <th>Estado</th>
+    </tr>
+    {% for alumno in alumnos %}
+    <tr data-alumno-id="{{ alumno.id }}">
+    <td>{{ alumno.nombre }}</td>
+    <td>{{ alumno.rut }}</td>
+    <td class="estado">
+        {% if alumno.detectado %}
+            <span style="color:green;">Detectado</span>
+        {% else %}
+            <span style="color:red;">No detectado</span>
+        {% endif %}
+    </td>
+</tr>
+    {% endfor %}
+</table>
+
+<!-- Script para mostrar la cámara (solo frontend, sin lógica de reconocimiento aún) -->
+<script>
+    const video = document.getElementById('video');
+    const claseId = {{ clase_id }}; // ID de la clase actual
+    let intervalId;
+
+    // Iniciar la cámara
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(function(stream) {
+                video.srcObject = stream;
+                video.play();
+
+                // Capturar fotogramas cada 3 segundos
+                intervalId = setInterval(capturarFotograma, 3000);
+            })
+            .catch(function(err) {
+                video.style.display = 'none';
+                alert('No se pudo acceder a la cámara.');
+            });
+    }
+
+    function capturarFotograma() {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const context = canvas.getContext('2d');
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // Convertir la imagen a Base64
+        const imagenBase64 = canvas.toDataURL('image/png');
+
+        // Enviar la imagen al backend
+        fetch(`/procesar_fotograma/${claseId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ imagen: imagenBase64 })
+        })
+        .then(response => {
+    console.log("Respuesta del servidor:", response);
+    return response.json();
+})
+        .then(data => {
+            if (data.alumnos) {
+                actualizarEstadoAlumnos(data.alumnos);
+            }
+        })
+        .catch(error => {
+            console.error('Error al procesar el fotograma:', error);
+        });
+    }
+
+    function actualizarEstadoAlumnos(alumnos) {
+        alumnos.forEach(alumno => {
+            const fila = document.querySelector(`tr[data-alumno-id="${alumno.id}"]`);
+            if (fila) {
+                const estadoCelda = fila.querySelector('.estado');
+                if (alumno.detectado) {
+                    estadoCelda.innerHTML = '<span style="color:green;">Detectado</span>';
+                } else {
+                    estadoCelda.innerHTML = '<span style="color:red;">No detectado</span>';
+                }
+            }
+        });
+    }
+
+    // Detener la captura de fotogramas al salir de la página
+    window.addEventListener('beforeunload', () => {
+        clearInterval(intervalId);
+        if (video.srcObject) {
+            video.srcObject.getTracks().forEach(track => track.stop());
+        }
+    });
+</script>
+{% endblock %}

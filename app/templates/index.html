@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Inicio{% endblock %}
+{% block content %}
+<h1>Bienvenido, {{ nombre_profesor }}</h1>
+<h2>Mis Clases</h2>
+{% if clases %}
+    <table>
+        <tr>
+            <th>Nombre</th>
+            <th>Fecha</th>
+            <th>Opciones</th>
+        </tr>
+        {% for clase in clases %}
+        <tr>
+            <td>{{ clase[1] }}</td>
+            <td>{{ clase[2] }}</td>
+            <td>
+                <a href="{{ url_for('main.asistencia', clase_id=clase[0]) }}">Pasar asistencia</a> |
+                <a href="{{ url_for('main.ingresar_alumno', clase_id=clase[0]) }}">Ingresar alumno</a> |
+                <a href="{{ url_for('main.listar_alumnos', clase_id=clase[0]) }}">Ver alumnos</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+{% else %}
+    <p>No tienes clases registradas.</p>
+{% endif %}
+{% endblock %}
