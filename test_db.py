@@ -21,7 +21,9 @@ def insertar_datos():
         ("Arturo Vargas", "avargas", hash_password("arturo123")),
         ("Claudia Ríos", "crios", hash_password("claudia123"))
     ]
-    cursor.executemany("INSERT INTO profesor (nombre, usuario, password_hash) VALUES (?, ?, ?)", profesores)
+    cursor.executemany("INSERT OR IGNORE INTO profesor (nombre, usuario, password_hash) VALUES (?, ?, ?)", profesores)
+
+
 
     # Insertar alumnos
     nombres_alumnos = [
@@ -37,7 +39,7 @@ def insertar_datos():
         datos_rostro = generar_vector_rostro()
         alumnos.append((nombre, rut, datos_rostro))
 
-    cursor.executemany("INSERT INTO alumno (nombre, rut, datos_rostro) VALUES (?, ?, ?)", alumnos)
+    cursor.executemany("INSERT OR IGNORE INTO alumno (nombre, rut, datos_rostro) VALUES (?, ?, ?)", alumnos)
 
     # Insertar clases (últimos 3 días)
     clases = [
@@ -45,7 +47,7 @@ def insertar_datos():
         ("Redes y Seguridad", (date.today() - timedelta(days=1)).isoformat()),
         ("Programación Avanzada", (date.today() - timedelta(days=2)).isoformat())
     ]
-    cursor.executemany("INSERT INTO clase (nombre, fecha) VALUES (?, ?)", clases)
+    cursor.executemany("INSERT OR IGNORE INTO clase (nombre, fecha) VALUES (?, ?)", clases)
 
     # Obtener IDs generados
     cursor.execute("SELECT id FROM profesor")
@@ -62,14 +64,15 @@ def insertar_datos():
     for i, profesor_id in enumerate(ids_profesores):
         profesor_clase.append((profesor_id, ids_clases[i % len(ids_clases)]))
         profesor_clase.append((profesor_id, ids_clases[(i+1) % len(ids_clases)]))
-    cursor.executemany("INSERT INTO profesor_clase (profesor_id, clase_id) VALUES (?, ?)", profesor_clase)
+    cursor.executemany("INSERT OR IGNORE INTO profesor_clase (profesor_id, clase_id) VALUES (?, ?)", profesor_clase)
+
 
     # Relacionar alumnos con dos clases cada uno (alternando)
     alumno_clase = []
     for i, alumno_id in enumerate(ids_alumnos):
         alumno_clase.append((alumno_id, ids_clases[i % len(ids_clases)]))
         alumno_clase.append((alumno_id, ids_clases[(i+1) % len(ids_clases)]))
-    cursor.executemany("INSERT INTO alumno_clase (alumno_id, clase_id) VALUES (?, ?)", alumno_clase)
+    cursor.executemany("INSERT OR IGNORE INTO alumno_clase (alumno_id, clase_id) VALUES (?, ?)", alumno_clase)
 
     conexion.commit()
     conexion.close()

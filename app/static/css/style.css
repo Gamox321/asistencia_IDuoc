@@ -1,11 +1,45 @@
-body {
-    font-family: Arial, sans-serif;
-    padding: 20px;
+.bienvenida-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: calc(100vh - 60px); /* resta nav */
+    background: linear-gradient(to right, #f5f7fa, #c3cfe2);
 }
-nav {
-    margin-bottom: 20px;
+
+.bienvenida-box {
+    text-align: center;
+    background: white;
+    padding: 40px;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    max-width: 500px;
+    width: 90%;
 }
-.container {
-    max-width: 800px;
-    margin: auto;
+
+.bienvenida-box h1 {
+    font-size: 32px;
+    margin-bottom: 10px;
+    color: #333;
+}
+
+.bienvenida-box p {
+    font-size: 18px;
+    margin-bottom: 30px;
+    color: #555;
+}
+
+.btn-inicio-sesion {
+    display: inline-block;
+    background-color: #007bff;
+    color: white;
+    padding: 14px 28px;
+    font-size: 16px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: bold;
+    transition: background-color 0.3s ease;
+}
+
+.btn-inicio-sesion:hover {
+    background-color: #0056b3;
 }

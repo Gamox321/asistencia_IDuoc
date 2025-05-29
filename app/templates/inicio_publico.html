@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Bienvenido{% endblock %}
+
+{% block content %}
+<div class="bienvenida-container">
+    <div class="bienvenida-box">
+        <h1>Bienvenido al Sistema de Asistencia</h1>
+        <p>Accede con tu cuenta para gestionar tus clases y asistencia.</p>
+        <a href="{{ url_for('login') }}" class="btn-inicio-sesion">
+            🔐 Iniciar sesión
+        </a>
+    </div>
+</div>
+{% endblock %}

@@ -1,40 +1,54 @@
 {% extends "base.html" %}
 {% block title %}Asistencia{% endblock %}
+
 {% block content %}
-<h2>Registrar asistencia</h2>
+
+<h2 style="text-align: center;">Registrar Asistencia</h2>
+
+<!-- Selector de clases -->
+<div style="text-align: center; margin-bottom: 20px;">
+    <form method="GET" action="" onsubmit="return false;">
+        <label for="selector_clase">Selecciona otra clase:</label>
+        <select id="selector_clase" onchange="cambiarClase(this)">
+            {% for clase in clases_disponibles %}
+                <option value="{{ clase[0] }}" {% if clase[0] == clase_id %}selected{% endif %}>
+                    {{ clase[1] }}
+                </option>
+            {% endfor %}
+        </select>
+    </form>
+</div>
 
 <!-- Espacio para la cámara -->
 <div style="text-align:center;">
     <video id="video" width="400" height="300" autoplay style="border:1px solid #ccc;"></video>
-    <br>
 </div>
 
-<h3>Alumnos del curso</h3>
-<table>
-    <tr>
-        <th>Nombre</th>
-        <th>RUT</th>
-        <th>Estado</th>
+<h3 style="margin-top: 30px;">Alumnos del curso</h3>
+<table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+    <tr style="background-color: #f0f0f0;">
+        <th style="padding: 10px; border: 1px solid #ddd;">Nombre</th>
+        <th style="padding: 10px; border: 1px solid #ddd;">RUT</th>
+        <th style="padding: 10px; border: 1px solid #ddd;">Estado</th>
     </tr>
     {% for alumno in alumnos %}
     <tr data-alumno-id="{{ alumno.id }}">
-    <td>{{ alumno.nombre }}</td>
-    <td>{{ alumno.rut }}</td>
-    <td class="estado">
-        {% if alumno.detectado %}
-            <span style="color:green;">Detectado</span>
-        {% else %}
-            <span style="color:red;">No detectado</span>
-        {% endif %}
-    </td>
-</tr>
+        <td style="padding: 8px; border: 1px solid #ddd;">{{ alumno.nombre }}</td>
+        <td style="padding: 8px; border: 1px solid #ddd;">{{ alumno.rut }}</td>
+        <td class="estado" style="padding: 8px; border: 1px solid #ddd;">
+            {% if alumno.detectado %}
+                <span style="color:green;">Detectado</span>
+            {% else %}
+                <span style="color:red;">No detectado</span>
+            {% endif %}
+        </td>
+    </tr>
     {% endfor %}
 </table>
 
-<!-- Script para mostrar la cámara (solo frontend, sin lógica de reconocimiento aún) -->
 <script>
     const video = document.getElementById('video');
-    const claseId = {{ clase_id }}; // ID de la clase actual
+    const claseId = {{ clase_id }};
     let intervalId;
 
     // Iniciar la cámara
@@ -43,8 +57,6 @@
             .then(function(stream) {
                 video.srcObject = stream;
                 video.play();
-
-                // Capturar fotogramas cada 3 segundos
                 intervalId = setInterval(capturarFotograma, 3000);
             })
             .catch(function(err) {
@@ -59,22 +71,14 @@
         canvas.height = video.videoHeight;
         const context = canvas.getContext('2d');
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        // Convertir la imagen a Base64
         const imagenBase64 = canvas.toDataURL('image/png');
 
-        // Enviar la imagen al backend
         fetch(`/procesar_fotograma/${claseId}`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ imagen: imagenBase64 })
         })
-        .then(response => {
-    console.log("Respuesta del servidor:", response);
-    return response.json();
-})
+        .then(response => response.json())
         .then(data => {
             if (data.alumnos) {
                 actualizarEstadoAlumnos(data.alumnos);
@@ -90,16 +94,18 @@
             const fila = document.querySelector(`tr[data-alumno-id="${alumno.id}"]`);
             if (fila) {
                 const estadoCelda = fila.querySelector('.estado');
-                if (alumno.detectado) {
-                    estadoCelda.innerHTML = '<span style="color:green;">Detectado</span>';
-                } else {
-                    estadoCelda.innerHTML = '<span style="color:red;">No detectado</span>';
-                }
+                estadoCelda.innerHTML = alumno.detectado
+                    ? '<span style="color:green;">Detectado</span>'
+                    : '<span style="color:red;">No detectado</span>';
             }
         });
     }
 
-    // Detener la captura de fotogramas al salir de la página
+    function cambiarClase(select) {
+        const nuevaClase = select.value;
+        window.location.href = "/asistencia/" + nuevaClase;
+    }
+
     window.addEventListener('beforeunload', () => {
         clearInterval(intervalId);
         if (video.srcObject) {
@@ -107,4 +113,5 @@
         }
     });
 </script>
+
 {% endblock %}

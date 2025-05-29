@@ -17,7 +17,7 @@
             <!-- Botón para activar la cámara -->
             <button onclick="activarCamara('{{ alumno.id }}')">Cámara</button>
             <!-- Botón para subir foto -->
-            <form action="{{ url_for('main.ingresar_alumno', clase_id=clase_id) }}" method="post" enctype="multipart/form-data" style="display:inline;">
+            <form action="{{ url_for('ingresar_alumno', clase_id=clase_id) }}" method="post" enctype="multipart/form-data" style="display:inline;">
                 <input type="file" name="foto_{{ alumno.id }}" accept="image/*" style="display:none;" onchange="this.form.submit()">
                 <button type="button" onclick="this.previousElementSibling.click();">Subir foto</button>
             </form>
