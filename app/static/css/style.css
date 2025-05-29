@@ -43,3 +43,61 @@
 .btn-inicio-sesion:hover {
     background-color: #0056b3;
 }
+
+.contenedor-clases {
+    padding: 30px;
+}
+
+.tabla-clases {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    overflow: hidden;
+}
+
+.tabla-clases th, .tabla-clases td {
+    padding: 14px 20px;
+    text-align: left;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.tabla-clases th {
+    background-color: #f7f7f7;
+    font-weight: 600;
+    font-size: 15px;
+}
+
+.tabla-clases tr:hover {
+    background-color: #f0f8ff;
+}
+
+.btn {
+    background-color: #007bff;
+    color: white;
+    padding: 6px 14px;
+    margin-right: 6px;
+    border-radius: 6px;
+    text-decoration: none;
+    font-size: 14px;
+    transition: background-color 0.3s ease;
+}
+
+.btn:hover {
+    background-color: #0056b3;
+}
+
+.input-buscador {
+    padding: 10px;
+    margin: 15px 0;
+    font-size: 16px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+}
+
+.input-buscador:focus {
+    border-color: #007bff;
+    outline: none;
+}
