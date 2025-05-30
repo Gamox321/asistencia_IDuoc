@@ -1,30 +1,91 @@
-{% extends "base.html" %}
-{% block title %}Login{% endblock %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iniciar Sesión</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- AOS Animations -->
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        AOS.init();
+      });
+    </script>
+    <style>
+      body::before {
+        content: "";
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-image: url('/static/img/fondo_login.jpg');
+        background-size: cover;
+        background-position: center;
+        opacity: 0.25;
+        z-index: -1;
+      }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 min-h-screen flex flex-col">
+    <!-- Barra de navegación -->
+    <nav class="bg-gray-900 text-white py-3 px-6 shadow-md flex justify-between items-center">
+        <div class="flex items-center space-x-4">
+            <img src="/static/img/logo.png" alt="Logo" class="w-10 h-10">
+            <span class="text-xl font-bold">IDuoc Asistencia</span>
+        </div>
+        <!-- <div class="space-x-4">
+            {% if 'profesor_id' in session %}
+                <a href="/" class="hover:underline text-sm">Inicio</a>
+                <a href="/ver_clases" class="hover:underline text-sm">Mis Clases</a>
+                <a href="/logout" class="hover:underline text-sm">Cerrar Sesión</a>
+            {% endif %}
+        </div> -->
+    </nav>
 
-{% block content %}
-<div style="max-width: 400px; margin: 50px auto; padding: 20px; border: 1px solid #ccc; border-radius: 10px;">
-    <h2 style="text-align: center;">Iniciar Sesión</h2>
+    <!-- Contenedor del formulario -->
+    <div class="flex-grow flex items-center justify-center">
+        <div class="bg-gray-800 bg-opacity-80 shadow-xl rounded-3xl p-8 max-w-md w-full text-center text-white backdrop-blur-lg mt-6" data-aos="fade-up">
+            <img src="/static/img/logo.png" alt="Logo institucional" class="mx-auto w-20 mb-5">
+            <h2 class="text-3xl font-extrabold mb-3">Iniciar Sesión</h2>
+            <p class="mb-5 text-gray-200 text-sm">Accede a tu cuenta para comenzar a registrar asistencia.</p>
 
-    {% with messages = get_flashed_messages() %}
-      {% if messages %}
-        <ul style="color: red;">
-          {% for message in messages %}
-            <li>{{ message }}</li>
-          {% endfor %}
-        </ul>
-      {% endif %}
-    {% endwith %}
+            {% with messages = get_flashed_messages() %}
+              {% if messages %}
+                <ul class="text-red-300 text-sm mb-4">
+                  {% for message in messages %}
+                    <li>{{ message }}</li>
+                  {% endfor %}
+                </ul>
+              {% endif %}
+            {% endwith %}
 
-    <form method="POST" action="{{ url_for('login') }}">
-        <label for="username">Usuario:</label>
-        <input type="text" id="username" name="username" required><br>
+            <form method="POST" action="{{ url_for('login') }}" class="space-y-4">
+    <label for="username" class="block text-left text-sm font-medium text-white-700">Usuario:</label>
+    <input type="text" id="username" name="username" required
+        class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400">
 
-        <label for="password">Contraseña:</label>
-        <input type="password" id="password" name="password" required><br>
+    <label for="password" class="block text-left text-sm font-medium text-white-700">Contraseña:</label>
+    <input type="password" id="password" name="password" required
+        class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400">
 
-        <button type="submit">Iniciar sesión</button>
-    </form>
-</div>
-{% endblock %}
+    <button type="submit"
+        class="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 rounded-lg font-semibold transition duration-300">
+        Iniciar sesión
+    </button>
+
+    <!-- Enlace al inicio público -->
+    <a href="/" class="mt-4 inline-block text-sm text-blue-600 hover:underline">
+        ← Volver al inicio
+    </a>
+</form>
 
 
+            <p class="text-gray-300 mt-5 text-xs">&copy; {{ current_year }} Sistema de Asistencia</p>
+        </div>
+    </div>
+</body>
+</html>

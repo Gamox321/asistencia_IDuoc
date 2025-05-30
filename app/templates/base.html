@@ -3,82 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <title>{% block title %}Asistencia{% endblock %}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding-top: 60px;
-            background-color: #f4f4f4;
-        }
 
-        nav {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            background-color: #333;
-            color: white;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 20px;
-            z-index: 1000;
-        }
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
 
-        nav a {
-            color: white;
-            text-decoration: none;
-            margin-left: 15px;
-        }
+    <!-- AOS Animations -->
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        AOS.init();
+      });
+    </script>
 
-        nav a:hover {
-            text-decoration: underline;
-        }
-
-        .container {
-            max-width: 1000px;
-            margin: auto;
-            padding: 20px;
-            background-color: white;
-            border-radius: 8px;
-            box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.1);
-        }
-
-        .usuario {
-            font-size: 14px;
-            margin-right: 15px;
-            color: #ccc;
-        }
-    </style>
+    {% block head_extra %}{% endblock %}
 </head>
-<body>
+<body class="bg-gray-100 text-gray-800 min-h-screen flex flex-col">
 
-    <nav>
-    <div>
-        <a href="{{ url_for('home') }}">Inicio</a>
-        {% if 'usuario' in session %}
-            <a href="{{ url_for('ver_clases') }}">Mis Clases</a>
-        {% endif %}
+<!-- Barra de navegación -->
+<nav class="bg-gray-900 text-white py-3 px-6 shadow-md flex justify-between items-center">
+    <div class="flex items-center space-x-4">
+        <a href="{{ url_for('home') }}">
+            <img src="/static/img/logo.png" alt="Logo" class="w-10 h-10">
+        </a>
+        <span class="text-lg font-semibold">IDuoc Asistencia</span>
     </div>
-    <div>
-        {% if 'usuario' in session %}
-    <span class="usuario">{{ session['usuario'] }}</span>
-    <a href="{{ url_for('logout') }}">Cerrar sesión</a>
-{% elif request.endpoint not in ['home', 'login'] %}
-    <a href="{{ url_for('login') }}">Iniciar sesión</a>
-{% endif %}
-
+    <div class="space-x-4">
+        {% if session.get('usuario') %}
+            <span class="text-sm">{{ session['usuario'] }}</span>
+            <a href="{{ url_for('logout') }}" class="hover:underline text-sm">Cerrar sesión</a>
+        {% endif %}
     </div>
 </nav>
 
-
-    <div class="container">
-        {% block content %}{% endblock %}
-    </div>
+<!-- Contenido principal -->
+<div class="flex-grow container mx-auto p-6">
+    {% block content %}{% endblock %}
+</div>
 
 </body>
 </html>
-
-

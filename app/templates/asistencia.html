@@ -2,56 +2,118 @@
 {% block title %}Asistencia{% endblock %}
 
 {% block content %}
+<style>
+    .asistencia-container {
+        max-width: 1000px;
+        margin: 30px auto;
+        background-color: #ffffff;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
 
-<h2 style="text-align: center;">Registrar Asistencia</h2>
+    .asistencia-container h2 {
+        text-align: center;
+        margin-bottom: 20px;
+    }
 
-<!-- Selector de clases -->
-<div style="text-align: center; margin-bottom: 20px;">
-    <form method="GET" action="" onsubmit="return false;">
-        <label for="selector_clase">Selecciona otra clase:</label>
-        <select id="selector_clase" onchange="cambiarClase(this)">
-            {% for clase in clases_disponibles %}
-                <option value="{{ clase[0] }}" {% if clase[0] == clase_id %}selected{% endif %}>
-                    {{ clase[1] }}
-                </option>
-            {% endfor %}
-        </select>
-    </form>
+    .selector-container {
+        text-align: center;
+        margin-bottom: 25px;
+    }
+
+    select {
+        padding: 10px;
+        font-size: 16px;
+        border-radius: 8px;
+        border: 1px solid #ccc;
+    }
+
+    video {
+        display: block;
+        margin: 0 auto;
+        border: 2px solid #ccc;
+        border-radius: 8px;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 25px;
+    }
+
+    th, td {
+        padding: 12px;
+        border: 1px solid #ddd;
+        text-align: center;
+    }
+
+    th {
+        background-color: #f0f0f0;
+    }
+
+    .estado span {
+        font-weight: bold;
+    }
+
+    .detectado {
+        color: green;
+    }
+
+    .no-detectado {
+        color: red;
+    }
+</style>
+
+<div class="asistencia-container">
+    <h2>📷 Registro de Asistencia</h2>
+
+    <!-- Selector de clases -->
+    <div class="selector-container">
+        <form method="GET" action="" onsubmit="return false;">
+            <label for="selector_clase"><strong>Selecciona otra clase:</strong></label>
+            <select id="selector_clase" onchange="cambiarClase(this)">
+                {% for clase in clases_disponibles %}
+                    <option value="{{ clase[0] }}" {% if clase[0] == clase_id %}selected{% endif %}>
+                        {{ clase[1] }}
+                    </option>
+                {% endfor %}
+            </select>
+        </form>
+    </div>
+
+    <!-- Cámara -->
+    <video id="video" width="400" height="300" autoplay></video>
+
+    <!-- Tabla de alumnos -->
+    <h3 style="margin-top: 30px;">🧑‍🎓 Lista de Alumnos</h3>
+    <table>
+        <tr>
+            <th>Nombre</th>
+            <th>RUT</th>
+            <th>Estado</th>
+        </tr>
+        {% for alumno in alumnos %}
+        <tr data-alumno-id="{{ alumno.id }}">
+            <td>{{ alumno.nombre }}</td>
+            <td>{{ alumno.rut }}</td>
+            <td class="estado">
+                {% if alumno.detectado %}
+                    <span class="detectado">Detectado</span>
+                {% else %}
+                    <span class="no-detectado">No detectado</span>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
 </div>
-
-<!-- Espacio para la cámara -->
-<div style="text-align:center;">
-    <video id="video" width="400" height="300" autoplay style="border:1px solid #ccc;"></video>
-</div>
-
-<h3 style="margin-top: 30px;">Alumnos del curso</h3>
-<table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
-    <tr style="background-color: #f0f0f0;">
-        <th style="padding: 10px; border: 1px solid #ddd;">Nombre</th>
-        <th style="padding: 10px; border: 1px solid #ddd;">RUT</th>
-        <th style="padding: 10px; border: 1px solid #ddd;">Estado</th>
-    </tr>
-    {% for alumno in alumnos %}
-    <tr data-alumno-id="{{ alumno.id }}">
-        <td style="padding: 8px; border: 1px solid #ddd;">{{ alumno.nombre }}</td>
-        <td style="padding: 8px; border: 1px solid #ddd;">{{ alumno.rut }}</td>
-        <td class="estado" style="padding: 8px; border: 1px solid #ddd;">
-            {% if alumno.detectado %}
-                <span style="color:green;">Detectado</span>
-            {% else %}
-                <span style="color:red;">No detectado</span>
-            {% endif %}
-        </td>
-    </tr>
-    {% endfor %}
-</table>
 
 <script>
     const video = document.getElementById('video');
     const claseId = {{ clase_id }};
     let intervalId;
 
-    // Iniciar la cámara
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         navigator.mediaDevices.getUserMedia({ video: true })
             .then(function(stream) {
@@ -95,8 +157,8 @@
             if (fila) {
                 const estadoCelda = fila.querySelector('.estado');
                 estadoCelda.innerHTML = alumno.detectado
-                    ? '<span style="color:green;">Detectado</span>'
-                    : '<span style="color:red;">No detectado</span>';
+                    ? '<span class="detectado">Detectado</span>'
+                    : '<span class="no-detectado">No detectado</span>';
             }
         });
     }
@@ -113,5 +175,5 @@
         }
     });
 </script>
-
 {% endblock %}
+

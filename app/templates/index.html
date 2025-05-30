@@ -1,9 +1,74 @@
-{% extends "base.html" %}
-{% block title %}Inicio{% endblock %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}Inicio{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-{% block content %}
-<h1>Bienvenido, {{ nombre_profesor }}</h1>
-<p>Selecciona una opción desde el menú para comenzar.</p>
-{% endblock %}
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
 
+    <!-- AOS Animations -->
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        AOS.init();
+      });
+    </script>
 
+    <style>
+      body::before {
+        content: "";
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-image: url('/static/img/fondo_inicio.jpg');
+        background-size: cover;
+        background-position: center;
+        opacity: 0.2;
+        z-index: -1;
+      }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 min-h-screen flex flex-col">
+
+<!-- Barra de navegación -->
+<nav class="bg-gray-900 text-white py-3 px-6 shadow-md flex justify-between items-center">
+    <div class="flex items-center space-x-4">
+        <a href="{{ url_for('home') }}">
+            <img src="/static/img/logo.png" alt="Logo" class="w-10 h-10">
+        </a>
+        <span class="text-lg font-semibold">IDuoc Asistencia</span>
+    </div>
+    <div class="space-x-4">
+        {% if session.get('usuario') %}
+            <span class="text-sm">{{ session['usuario'] }}</span>
+            <a href="{{ url_for('logout') }}" class="hover:underline text-sm">Cerrar sesión</a>
+        {% endif %}
+    </div>
+</nav>
+
+<!-- Contenido principal -->
+<div class="flex-grow container mx-auto p-6">
+    <section class="text-center py-10" data-aos="fade-up">
+        <h1 class="text-4xl font-bold mb-4">Bienvenido al Sistema de Asistencia</h1>
+        <p class="text-lg text-gray-700">Administra clases, registra alumnos y lleva el control de asistencia con facilidad.</p>
+    </section>
+
+    <section class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6" data-aos="fade-up">
+        <a href="{{ url_for('ver_clases') }}" class="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition">
+            <h2 class="text-xl font-semibold mb-2">📚 Ver Mis Clases</h2>
+            <p class="text-gray-600">Accede a la lista de tus clases y gestiona cada una fácilmente.</p>
+        </a>
+        <a href="{{ url_for('asistencia', clase_id=1) }}" class="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition">
+            <h2 class="text-xl font-semibold mb-2">✅ Pasar Asistencia</h2>
+            <p class="text-gray-600">Registra asistencia automáticamente mediante reconocimiento facial.</p>
+        </a>
+    </section>
+</div>
+
+</body>
+</html>

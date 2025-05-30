@@ -2,21 +2,21 @@
 {% block title %}Mis Clases{% endblock %}
 
 {% block content %}
-<div class="contenedor-clases">
-    <h1>Bienvenido, {{ nombre_profesor }}</h1>
-    <h2>📚 Mis Clases</h2>
+<div class="contenedor">
+    <h1 class="titulo-principal">Bienvenido, {{ nombre_profesor }}</h1>
 
-    <!-- Filtro desplegable -->
-    <label for="filtro-clase"><strong>Filtrar por clase:</strong></label>
-    <select id="filtro-clase" class="input-buscador">
-        <option value="todas">Todas</option>
-        {% for clase in clases %}
-            <option value="{{ clase[1] | lower | replace(' ', '-') }}">{{ clase[1] }}</option>
-        {% endfor %}
-    </select>
+    <div class="filtro-container">
+        <label for="filtro-clase"><strong>Filtrar por clase:</strong></label>
+        <select id="filtro-clase" class="input-buscador">
+            <option value="todas">Todas</option>
+            {% for clase in clases %}
+                <option value="{{ clase[1] | lower | replace(' ', '-') }}">{{ clase[1] }}</option>
+            {% endfor %}
+        </select>
+    </div>
 
     {% if clases %}
-    <table class="tabla-clases">
+    <table class="tabla">
         <thead>
             <tr>
                 <th>📘 Nombre</th>
@@ -30,7 +30,7 @@
                 <td>{{ clase[1] }}</td>
                 <td>{{ clase[2] }}</td>
                 <td>
-                    <a href="{{ url_for('asistencia', clase_id=clase[0]) }}" class="btn">✅ Pasar asistencia</a>
+                    <a href="{{ url_for('asistencia', clase_id=clase[0]) }}" class="btn">✅ Asistencia</a>
                     <a href="{{ url_for('ingresar_alumno', clase_id=clase[0]) }}" class="btn">📤 Ingresar alumno</a>
                     <a href="{{ url_for('listar_alumnos', clase_id=clase[0]) }}" class="btn">👥 Ver alumnos</a>
                 </td>
@@ -39,25 +39,19 @@
         </tbody>
     </table>
     {% else %}
-    <p>No hay clases asignadas aún.</p>
+    <p class="mensaje-vacio">No hay clases asignadas aún.</p>
     {% endif %}
 </div>
 
-<!-- Script para filtrar por clase -->
 <script>
-document.getElementById('filtro-clase').addEventListener('change', function () {
-    const seleccion = this.value;
-    const filas = document.querySelectorAll('.fila-clase');
-
-    filas.forEach(fila => {
-        const nombreClase = fila.getAttribute('data-nombre');
-        if (seleccion === 'todas' || nombreClase === seleccion) {
-            fila.style.display = '';
-        } else {
-            fila.style.display = 'none';
-        }
+    document.getElementById('filtro-clase').addEventListener('change', function () {
+        let seleccion = this.value;
+        let filas = document.querySelectorAll('.fila-clase');
+        filas.forEach(fila => {
+            fila.style.display = seleccion === 'todas' || fila.dataset.nombre === seleccion ? '' : 'none';
+        });
     });
-});
 </script>
 {% endblock %}
+
 
