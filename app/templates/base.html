@@ -24,7 +24,7 @@
 <!-- Barra de navegación -->
 <nav class="bg-gray-900 text-white py-3 px-6 shadow-md flex justify-between items-center">
     <div class="flex items-center space-x-4">
-        <a href="{{ url_for('home') }}">
+        <a href="{{ url_for('main.home') }}">
             <img src="/static/img/logo.png" alt="Logo" class="w-10 h-10">
         </a>
         <span class="text-lg font-semibold">IDuoc Asistencia</span>
@@ -32,7 +32,7 @@
     <div class="space-x-4">
         {% if session.get('usuario') %}
             <span class="text-sm">{{ session['usuario'] }}</span>
-            <a href="{{ url_for('logout') }}" class="hover:underline text-sm">Cerrar sesión</a>
+            <a href="{{ url_for('main.logout') }}" class="hover:underline text-sm">Cerrar sesión</a>
         {% endif %}
     </div>
 </nav>

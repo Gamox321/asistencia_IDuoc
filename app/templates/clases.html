@@ -1,14 +1,180 @@
 {% extends "base.html" %}
-{% block title %}Mis Clases{% endblock %}
 
 {% block content %}
-<div class="contenedor">
-    <h1 class="titulo-principal">Bienvenido, {{ nombre_profesor }}</h1>
+<style>
+    .container-clases {
+        max-width: 1200px;
+        margin: 30px auto;
+        background-color: #ffffff;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .titulo-principal {
+        text-align: center;
+        color: #2c3e50;
+        font-size: 2.5rem;
+        margin-bottom: 30px;
+        font-weight: 600;
+    }
+
+    .filtro-container {
+        background-color: #f8f9fa;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 25px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 15px;
+    }
+
+    .filtro-container label {
+        color: #2c3e50;
+        font-size: 1.1rem;
+    }
+
+    .input-buscador {
+        padding: 10px 15px;
+        border: 2px solid #e0e0e0;
+        border-radius: 6px;
+        font-size: 1rem;
+        color: #2c3e50;
+        background-color: white;
+        min-width: 200px;
+        transition: all 0.3s ease;
+    }
+
+    .input-buscador:focus {
+        border-color: #3498db;
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+    }
+
+    .tabla {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        margin-top: 20px;
+        background: white;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .tabla thead {
+        background-color: #f8f9fa;
+    }
+
+    .tabla th {
+        padding: 15px;
+        text-align: left;
+        color: #2c3e50;
+        font-weight: 600;
+        border-bottom: 2px solid #e0e0e0;
+    }
+
+    .tabla td {
+        padding: 15px;
+        border-bottom: 1px solid #e0e0e0;
+        color: #34495e;
+    }
+
+    .tabla tr:last-child td {
+        border-bottom: none;
+    }
+
+    .tabla tr:hover {
+        background-color: #f8f9fa;
+    }
+
+    .acciones {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .btn {
+        padding: 8px 16px;
+        border-radius: 6px;
+        text-decoration: none;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .btn-asistencia {
+        background-color: #2ecc71;
+        color: white;
+    }
+
+    .btn-asistencia:hover {
+        background-color: #27ae60;
+    }
+
+    .btn-ingresar {
+        background-color: #3498db;
+        color: white;
+    }
+
+    .btn-ingresar:hover {
+        background-color: #2980b9;
+    }
+
+    .btn-ver {
+        background-color: #9b59b6;
+        color: white;
+    }
+
+    .btn-ver:hover {
+        background-color: #8e44ad;
+    }
+
+    .mensaje-vacio {
+        text-align: center;
+        padding: 40px;
+        color: #7f8c8d;
+        font-size: 1.2rem;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        margin-top: 20px;
+    }
+
+    .fecha {
+        color: #7f8c8d;
+        font-size: 0.9rem;
+    }
+
+    .nombre-clase {
+        font-weight: 500;
+        color: #2c3e50;
+    }
+
+    @media (max-width: 768px) {
+        .acciones {
+            flex-direction: column;
+        }
+
+        .btn {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .tabla td {
+            padding: 10px;
+        }
+    }
+</style>
+
+<div class="container-clases">
+    <h1 class="titulo-principal">📚 Mis Clases</h1>
 
     <div class="filtro-container">
-        <label for="filtro-clase"><strong>Filtrar por clase:</strong></label>
+        <label for="filtro-clase">🔍 Filtrar por clase:</label>
         <select id="filtro-clase" class="input-buscador">
-            <option value="todas">Todas</option>
+            <option value="todas">Todas las clases</option>
             {% for clase in clases %}
                 <option value="{{ clase[1] | lower | replace(' ', '-') }}">{{ clase[1] }}</option>
             {% endfor %}
@@ -21,34 +187,70 @@
             <tr>
                 <th>📘 Nombre</th>
                 <th>📅 Fecha</th>
-                <th>⚙️ Opciones</th>
+                <th>⚙️ Acciones</th>
             </tr>
         </thead>
         <tbody>
             {% for clase in clases %}
             <tr class="fila-clase" data-nombre="{{ clase[1] | lower | replace(' ', '-') }}">
-                <td>{{ clase[1] }}</td>
-                <td>{{ clase[2] }}</td>
                 <td>
-                    <a href="{{ url_for('asistencia', clase_id=clase[0]) }}" class="btn">✅ Asistencia</a>
-                    <a href="{{ url_for('ingresar_alumno', clase_id=clase[0]) }}" class="btn">📤 Ingresar alumno</a>
-                    <a href="{{ url_for('listar_alumnos', clase_id=clase[0]) }}" class="btn">👥 Ver alumnos</a>
+                    <span class="nombre-clase">{{ clase[1] }}</span>
+                </td>
+                <td>
+                    <span class="fecha">{{ clase[2] }}</span>
+                </td>
+                <td>
+                    <div class="acciones">
+                        <a href="{{ url_for('main.asistencia', clase_id=clase[0]) }}" class="btn btn-asistencia">
+                            ✅ Asistencia
+                        </a>
+                        <a href="{{ url_for('main.ingresar_alumno', clase_id=clase[0]) }}" class="btn btn-ingresar">
+                            📝 Ingresar Alumno
+                        </a>
+                        <a href="{{ url_for('main.listar_alumnos', clase_id=clase[0]) }}" class="btn btn-ver">
+                            👥 Ver Alumnos
+                        </a>
+                    </div>
                 </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
     {% else %}
-    <p class="mensaje-vacio">No hay clases asignadas aún.</p>
+    <div class="mensaje-vacio">
+        <p>📝 No hay clases asignadas aún.</p>
+    </div>
     {% endif %}
 </div>
 
 <script>
-    document.getElementById('filtro-clase').addEventListener('change', function () {
-        let seleccion = this.value;
-        let filas = document.querySelectorAll('.fila-clase');
+    document.getElementById('filtro-clase').addEventListener('change', function() {
+        const seleccion = this.value;
+        const filas = document.querySelectorAll('.fila-clase');
+        
         filas.forEach(fila => {
-            fila.style.display = seleccion === 'todas' || fila.dataset.nombre === seleccion ? '' : 'none';
+            const mostrar = seleccion === 'todas' || fila.dataset.nombre === seleccion;
+            fila.style.display = mostrar ? '' : 'none';
+            
+            // Añadir una transición suave
+            if (mostrar) {
+                fila.style.opacity = '0';
+                setTimeout(() => {
+                    fila.style.opacity = '1';
+                }, 50);
+            }
+        });
+    });
+
+    // Añadir transición inicial
+    document.addEventListener('DOMContentLoaded', function() {
+        const filas = document.querySelectorAll('.fila-clase');
+        filas.forEach((fila, index) => {
+            fila.style.opacity = '0';
+            setTimeout(() => {
+                fila.style.opacity = '1';
+                fila.style.transition = 'opacity 0.3s ease';
+            }, index * 100);
         });
     });
 </script>

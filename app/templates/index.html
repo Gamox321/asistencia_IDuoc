@@ -15,6 +15,9 @@
       document.addEventListener('DOMContentLoaded', () => {
         AOS.init();
       });
+      window.addEventListener('load', () => {
+        AOS.refresh();
+      });
     </script>
 
     <style>
@@ -38,7 +41,7 @@
 <!-- Barra de navegación -->
 <nav class="bg-gray-900 text-white py-3 px-6 shadow-md flex justify-between items-center">
     <div class="flex items-center space-x-4">
-        <a href="{{ url_for('home') }}">
+        <a href="{{ url_for('main.home') }}">
             <img src="/static/img/logo.png" alt="Logo" class="w-10 h-10">
         </a>
         <span class="text-lg font-semibold">IDuoc Asistencia</span>
@@ -46,7 +49,7 @@
     <div class="space-x-4">
         {% if session.get('usuario') %}
             <span class="text-sm">{{ session['usuario'] }}</span>
-            <a href="{{ url_for('logout') }}" class="hover:underline text-sm">Cerrar sesión</a>
+            <a href="{{ url_for('main.logout') }}" class="hover:underline text-sm">Cerrar sesión</a>
         {% endif %}
     </div>
 </nav>
@@ -59,11 +62,11 @@
     </section>
 
     <section class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6" data-aos="fade-up">
-        <a href="{{ url_for('ver_clases') }}" class="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition">
+        <a href="{{ url_for('main.ver_clases') }}" class="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition">
             <h2 class="text-xl font-semibold mb-2">📚 Ver Mis Clases</h2>
             <p class="text-gray-600">Accede a la lista de tus clases y gestiona cada una fácilmente.</p>
         </a>
-        <a href="{{ url_for('asistencia', clase_id=1) }}" class="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition">
+        <a href="{{ url_for('main.asistencia', clase_id=1) }}" class="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition">
             <h2 class="text-xl font-semibold mb-2">✅ Pasar Asistencia</h2>
             <p class="text-gray-600">Registra asistencia automáticamente mediante reconocimiento facial.</p>
         </a>

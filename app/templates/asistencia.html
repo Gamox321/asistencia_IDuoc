@@ -17,11 +17,6 @@
         margin-bottom: 20px;
     }
 
-    .selector-container {
-        text-align: center;
-        margin-bottom: 25px;
-    }
-
     select {
         padding: 10px;
         font-size: 16px;
@@ -56,124 +51,209 @@
         font-weight: bold;
     }
 
+    .presente {
+        color: #2ecc71;
+        font-weight: bold;
+    }
+
     .detectado {
-        color: green;
+        color: #f39c12;
+        font-weight: bold;
     }
 
     .no-detectado {
-        color: red;
+        color: #e74c3c;
+        font-weight: bold;
+    }
+    .btn-confirmar {
+        display: block;
+        width: max-content;
+        margin: 30px auto;
+        padding: 12px 25px;
+        background-color: #28a745;
+        color: white;
+        font-size: 18px;
+        font-weight: bold;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+    }
+
+    .btn-confirmar:hover {
+        background-color: #218838;
+    }
+
+    .detection-count {
+        font-size: 0.8em;
+        color: #666;
+        margin-left: 8px;
     }
 </style>
 
 <div class="asistencia-container">
     <h2>📷 Registro de Asistencia</h2>
 
-    <!-- Selector de clases -->
-    <div class="selector-container">
-        <form method="GET" action="" onsubmit="return false;">
-            <label for="selector_clase"><strong>Selecciona otra clase:</strong></label>
-            <select id="selector_clase" onchange="cambiarClase(this)">
-                {% for clase in clases_disponibles %}
-                    <option value="{{ clase[0] }}" {% if clase[0] == clase_id %}selected{% endif %}>
-                        {{ clase[1] }}
-                    </option>
-                {% endfor %}
-            </select>
-        </form>
-    </div>
-
     <!-- Cámara -->
     <video id="video" width="400" height="300" autoplay></video>
 
     <!-- Tabla de alumnos -->
     <h3 style="margin-top: 30px;">🧑‍🎓 Lista de Alumnos</h3>
-    <table>
-        <tr>
-            <th>Nombre</th>
-            <th>RUT</th>
-            <th>Estado</th>
-        </tr>
-        {% for alumno in alumnos %}
-        <tr data-alumno-id="{{ alumno.id }}">
-            <td>{{ alumno.nombre }}</td>
-            <td>{{ alumno.rut }}</td>
-            <td class="estado">
-                {% if alumno.detectado %}
-                    <span class="detectado">Detectado</span>
-                {% else %}
+    <form method="POST" action="{{ url_for('main.confirmar_asistencia', clase_id=clase_id) }}" onsubmit="return confirmarAsistencia()">
+        <table>
+            <tr>
+                <th>Nombre</th>
+                <th>RUT</th>
+                <th>Estado</th>
+            </tr>
+            {% for alumno in alumnos %}
+            <tr data-alumno-id="{{ alumno.id }}">
+                <td>{{ alumno.nombre }}</td>
+                <td>{{ alumno.rut }}</td>
+                <td class="estado">
                     <span class="no-detectado">No detectado</span>
-                {% endif %}
-            </td>
-        </tr>
-        {% endfor %}
-    </table>
+                    <span class="detection-count"></span>
+                    <input type="hidden" name="estado_{{ alumno.id }}" value="no-detectado">
+                    <input type="hidden" name="detecciones_{{ alumno.id }}" value="0">
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+        <button type="submit" class="btn-confirmar">Confirmar Asistencia</button>
+    </form>
 </div>
 
 <script>
-    const video = document.getElementById('video');
-    const claseId = {{ clase_id }};
-    let intervalId;
+    document.addEventListener('DOMContentLoaded', () => {
+        const video = document.getElementById('video');
+        const claseId = parseInt("{{ clase_id }}");
+        let intervalId;
+        // Objeto para mantener el conteo de detecciones por alumno
+        const deteccionesAlumnos = {};
 
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        navigator.mediaDevices.getUserMedia({ video: true })
-            .then(function(stream) {
-                video.srcObject = stream;
-                video.play();
-                intervalId = setInterval(capturarFotograma, 3000);
-            })
-            .catch(function(err) {
-                video.style.display = 'none';
-                alert('No se pudo acceder a la cámara.');
-            });
-    }
-
-    function capturarFotograma() {
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const context = canvas.getContext('2d');
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const imagenBase64 = canvas.toDataURL('image/png');
-
-        fetch(`/procesar_fotograma/${claseId}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ imagen: imagenBase64 })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.alumnos) {
-                actualizarEstadoAlumnos(data.alumnos);
-            }
-        })
-        .catch(error => {
-            console.error('Error al procesar el fotograma:', error);
-        });
-    }
-
-    function actualizarEstadoAlumnos(alumnos) {
-        alumnos.forEach(alumno => {
-            const fila = document.querySelector(`tr[data-alumno-id="${alumno.id}"]`);
-            if (fila) {
-                const estadoCelda = fila.querySelector('.estado');
-                estadoCelda.innerHTML = alumno.detectado
-                    ? '<span class="detectado">Detectado</span>'
-                    : '<span class="no-detectado">No detectado</span>';
-            }
-        });
-    }
-
-    function cambiarClase(select) {
-        const nuevaClase = select.value;
-        window.location.href = "/asistencia/" + nuevaClase;
-    }
-
-    window.addEventListener('beforeunload', () => {
-        clearInterval(intervalId);
-        if (video.srcObject) {
-            video.srcObject.getTracks().forEach(track => track.stop());
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(function(stream) {
+                    video.srcObject = stream;
+                    video.play();
+                    if (video.srcObject) {
+                        // Reducimos la frecuencia de captura a 5 segundos para dar tiempo al procesamiento
+                        intervalId = setInterval(capturarFotograma, 5000);
+                    }
+                })
+                .catch(function(err) {
+                    video.style.display = 'none';
+                    const container = document.querySelector('.asistencia-container');
+                    const errorMsg = document.createElement('p');
+                    errorMsg.textContent = 'No se pudo acceder a la cámara. Por favor, verifica los permisos.';
+                    errorMsg.style.color = 'red';
+                    errorMsg.style.textAlign = 'center';
+                    container.insertBefore(errorMsg, video);
+                });
+        } else {
+            const container = document.querySelector('.asistencia-container');
+            const errorMsg = document.createElement('p');
+            errorMsg.textContent = 'La funcionalidad de cámara no es compatible con este navegador.';
+            errorMsg.style.color = 'red';
+            errorMsg.style.textAlign = 'center';
+            container.insertBefore(errorMsg, video);
+            video.style.display = 'none';
         }
+
+        function capturarFotograma() {
+            if (!video.srcObject || video.videoWidth === 0 || video.videoHeight === 0) {
+                return;
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const context = canvas.getContext('2d');
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imagenBase64 = canvas.toDataURL('image/png');
+
+            fetch(`{{ url_for('main.procesar_fotograma', clase_id=clase_id) }}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ imagen: imagenBase64 })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(err => { throw err; });
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.alumnos) {
+                    actualizarEstadoAlumnos(data.alumnos);
+                }
+            })
+            .catch(error => {
+                console.error('Error al procesar el fotograma:', error.mensaje || error);
+            });
+        }
+
+        function actualizarEstadoAlumnos(alumnosDetectados) {
+            alumnosDetectados.forEach(alumno => {
+                const fila = document.querySelector(`tr[data-alumno-id="${alumno.id}"]`);
+                if (fila) {
+                    const estadoCelda = fila.querySelector('.estado');
+                    const spanEstado = estadoCelda.querySelector('span');
+                    const spanConteo = estadoCelda.querySelector('.detection-count');
+                    const inputEstado = estadoCelda.querySelector('input[name^="estado_"]');
+                    const inputDetecciones = estadoCelda.querySelector('input[name^="detecciones_"]');
+                    
+                    if (alumno.detectado) {
+                        // Incrementar contador de detecciones
+                        deteccionesAlumnos[alumno.id] = (deteccionesAlumnos[alumno.id] || 0) + 1;
+                        const numDetecciones = deteccionesAlumnos[alumno.id];
+                        
+                        // Actualizar conteo visible
+                        spanConteo.textContent = `(${numDetecciones}/5)`;
+                        inputDetecciones.value = numDetecciones;
+
+                        if (numDetecciones >= 5) {
+                            // Cambiar a estado "presente"
+                            spanEstado.textContent = 'Presente';
+                            spanEstado.className = 'presente';
+                            inputEstado.value = 'presente';
+                        } else {
+                            // Mantener en estado "detectado"
+                            spanEstado.textContent = 'Detectado';
+                            spanEstado.className = 'detectado';
+                            inputEstado.value = 'detectado';
+                        }
+                    } else if (spanEstado.textContent === 'No detectado') {
+                        // Solo actualizar si no está ya en estado "presente" o "detectado"
+                        spanEstado.textContent = 'No detectado';
+                        spanEstado.className = 'no-detectado';
+                        inputEstado.value = 'no-detectado';
+                        // Mantener el conteo actual si existe
+                        if (deteccionesAlumnos[alumno.id]) {
+                            spanConteo.textContent = `(${deteccionesAlumnos[alumno.id]}/5)`;
+                        }
+                    }
+                }
+            });
+        }
+
+        window.addEventListener('beforeunload', () => {
+            clearInterval(intervalId);
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+            }
+        });
     });
+
+    function confirmarAsistencia() {
+        // Contar cuántos alumnos están presentes
+        const presentes = document.querySelectorAll('input[name^="estado_"][value="presente"]').length;
+        const total = document.querySelectorAll('input[name^="estado_"]').length;
+        
+        return confirm(`¿Deseas confirmar la asistencia?\n\n` +
+                      `- ${presentes} alumno(s) marcado(s) como presente\n` +
+                      `- ${total - presentes} alumno(s) marcado(s) como ausente\n\n` +
+                      `Solo los alumnos con estado "Presente" (5 detecciones) serán registrados como presentes.`);
+    }
 </script>
 {% endblock %}
 

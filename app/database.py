@@ -1,76 +1,55 @@
 import sqlite3
+import os
+from .config import Config
 
-def crear_base_datos():
-    conexion = sqlite3.connect("asistencia.db")
-    cursor = conexion.cursor()
+class Database:
+    def __init__(self):
+        self.db_path = Config.DATABASE_PATH
 
-    # Tabla de profesores
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS profesor (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nombre TEXT NOT NULL,
-        usuario TEXT NOT NULL UNIQUE,
-        password_hash TEXT NOT NULL
-    );
-    """)
+    def get_connection(self):
+        """Obtener una conexión a la base de datos"""
+        return sqlite3.connect(self.db_path)
 
-    # Tabla de alumnos
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS alumno (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nombre TEXT NOT NULL,
-        rut TEXT NOT NULL UNIQUE,
-        datos_rostro BLOB NOT NULL
-    );
-    """)
+    def init_db(self):
+        """Inicializar la base de datos con todas las tablas necesarias"""
+        with open(os.path.join(os.path.dirname(__file__), 'schema.sql'), 'r') as f:
+            schema = f.read()
 
-    # Tabla de clases
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS clase (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nombre TEXT NOT NULL,
-        fecha DATE NOT NULL
-    );
-    """)
+        conn = self.get_connection()
+        try:
+            cursor = conn.cursor()
+            # Ejecutar el schema completo
+            cursor.executescript(schema)
+            conn.commit()
+            print(f"Base de datos inicializada correctamente en '{self.db_path}'")
+        except sqlite3.Error as e:
+            print(f"Error al inicializar la base de datos: {e}")
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
 
-    # Relación profesor-clase (muchos a muchos)
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS profesor_clase (
-        profesor_id INTEGER NOT NULL,
-        clase_id INTEGER NOT NULL,
-        PRIMARY KEY (profesor_id, clase_id),
-        FOREIGN KEY (profesor_id) REFERENCES profesor(id),
-        FOREIGN KEY (clase_id) REFERENCES clase(id)
-    );
-    """)
+    def get_db(self):
+        """Obtener una conexión a la base de datos con control de contexto"""
+        conn = self.get_connection()
+        try:
+            yield conn
+        finally:
+            conn.close()
 
-    # Relación alumno-clase (muchos a muchos)
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS alumno_clase (
-        alumno_id INTEGER NOT NULL,
-        clase_id INTEGER NOT NULL,
-        PRIMARY KEY (alumno_id, clase_id),
-        FOREIGN KEY (alumno_id) REFERENCES alumno(id),
-        FOREIGN KEY (clase_id) REFERENCES clase(id)
-    );
-    """)
+# Instancia global de la base de datos
+db = Database()
 
-    # Tabla de asistencias
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS asistencia (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        clase_id INTEGER NOT NULL,
-        alumno_id INTEGER NOT NULL,
-        presente BOOL NOT NULL,
-        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (clase_id) REFERENCES clase(id),
-        FOREIGN KEY (alumno_id) REFERENCES alumno(id)
-    );
-    """)
-
-    conexion.commit()
-    conexion.close()
-    print("Base de datos creada correctamente como 'asistencia.db'.")
-
-if __name__ == "__main__":
-    crear_base_datos()
+def init_app(app):
+    """Inicializar la aplicación con la base de datos"""
+    # Asegurarse de que el directorio de la base de datos existe
+    os.makedirs(os.path.dirname(Config.DATABASE_PATH), exist_ok=True)
+    
+    # Inicializar la base de datos si no existe
+    if not os.path.exists(Config.DATABASE_PATH):
+        db.init_db()
+    
+    # Registrar función de limpieza
+    @app.teardown_appcontext
+    def close_db(error):
+        pass  # SQLite se cierra automáticamente con el context manager
