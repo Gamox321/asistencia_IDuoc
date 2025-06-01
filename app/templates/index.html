@@ -66,9 +66,13 @@
             <h2 class="text-xl font-semibold mb-2">📚 Ver Mis Clases</h2>
             <p class="text-gray-600">Accede a la lista de tus clases y gestiona cada una fácilmente.</p>
         </a>
-        <a href="{{ url_for('main.asistencia', clase_id=1) }}" class="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition">
+        <a href="{{ url_for('main.ver_clases') }}" class="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition">
             <h2 class="text-xl font-semibold mb-2">✅ Pasar Asistencia</h2>
-            <p class="text-gray-600">Registra asistencia automáticamente mediante reconocimiento facial.</p>
+            <p class="text-gray-600">Selecciona una clase para registrar asistencia mediante reconocimiento facial.</p>
+        </a>
+        <a href="{{ url_for('main.ver_clases') }}" class="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition">
+            <h2 class="text-xl font-semibold mb-2">📊 Historial de Asistencia</h2>
+            <p class="text-gray-600">Selecciona una clase para ver su historial de asistencias.</p>
         </a>
     </section>
 </div>

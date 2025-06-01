@@ -1,0 +1,308 @@
+{% extends "base.html" %}
+{% block title %}Historial de Asistencia{% endblock %}
+
+{% block content %}
+<style>
+    .historial-container {
+        max-width: 1200px;
+        margin: 30px auto;
+        background-color: #ffffff;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .historial-container h2 {
+        text-align: center;
+        margin-bottom: 30px;
+        color: #2c3e50;
+        font-size: 2rem;
+    }
+
+    .tabla-historial {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+    }
+
+    .tabla-historial th, .tabla-historial td {
+        padding: 15px;
+        text-align: left;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    .tabla-historial th {
+        background-color: #f8f9fa;
+        color: #2c3e50;
+        font-weight: 600;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+
+    .tabla-historial tbody tr {
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+    }
+
+    .tabla-historial tbody tr:hover {
+        background-color: #f8f9fa;
+    }
+
+    .porcentaje-alto {
+        color: #27ae60;
+        font-weight: bold;
+    }
+
+    .porcentaje-medio {
+        color: #f39c12;
+        font-weight: bold;
+    }
+
+    .porcentaje-bajo {
+        color: #e74c3c;
+        font-weight: bold;
+    }
+
+    .detalle-alumnos {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s ease-out;
+        background-color: #f8f9fa;
+        opacity: 0;
+        visibility: hidden;
+    }
+
+    .detalle-alumnos.abierto {
+        max-height: 500px; /* Aumentado para mostrar más contenido */
+        overflow-y: auto;
+        margin: 10px 0;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        opacity: 1;
+        visibility: visible;
+        transition: max-height 0.5s ease-out, opacity 0.3s ease-out;
+    }
+
+    .tabla-alumnos {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 0;
+        background-color: white;
+    }
+
+    .tabla-alumnos th {
+        background-color: #f1f1f1;
+        color: #2c3e50;
+        font-weight: 600;
+        padding: 12px 15px;
+        position: sticky;
+        top: 0;
+        z-index: 1;
+    }
+
+    .tabla-alumnos td {
+        padding: 10px 15px;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    .tabla-alumnos tr:last-child td {
+        border-bottom: none;
+    }
+
+    .alumno-presente {
+        color: #27ae60;
+        font-weight: 500;
+    }
+
+    .alumno-ausente {
+        color: #e74c3c;
+        font-weight: 500;
+    }
+
+    .toggle-detalle {
+        cursor: pointer;
+        user-select: none;
+    }
+
+    .toggle-detalle:hover {
+        background-color: #f1f1f1;
+    }
+
+    .icono-toggle {
+        display: inline-block;
+        margin-right: 5px;
+        transition: transform 0.3s ease;
+        font-size: 0.8em;
+    }
+
+    .toggle-detalle.abierto .icono-toggle {
+        transform: rotate(90deg);
+    }
+
+    .toggle-detalle.abierto {
+        background-color: #f1f1f1;
+    }
+
+    .sin-registros {
+        text-align: center;
+        padding: 20px;
+        color: #666;
+        font-style: italic;
+    }
+
+    /* Estilos para el modal */
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+    }
+
+    .modal-content {
+        background-color: white;
+        margin: 5% auto;
+        padding: 20px;
+        width: 80%;
+        max-width: 1000px;
+        border-radius: 12px;
+        position: relative;
+    }
+
+    .close-button {
+        position: absolute;
+        right: 20px;
+        top: 15px;
+        font-size: 24px;
+        cursor: pointer;
+        color: #666;
+    }
+
+    .close-button:hover {
+        color: #333;
+    }
+</style>
+
+<div class="historial-container">
+    <h2>📊 Historial de Asistencia - {{ nombre_clase }}</h2>
+
+    {% if registros %}
+    <table class="tabla-historial">
+        <thead>
+            <tr>
+                <th>Fecha</th>
+                <th>Asistentes</th>
+                <th>Total Alumnos</th>
+                <th>Porcentaje</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for registro in registros %}
+            <tr class="toggle-detalle" data-index="{{ loop.index }}">
+                <td>
+                    <span class="icono-toggle">▶</span>
+                    {{ registro.fecha }}
+                </td>
+                <td>{{ registro.asistentes }}/{{ registro.total_alumnos }}</td>
+                <td>{{ registro.total_alumnos }}</td>
+                <td class="
+                    {% if registro.porcentaje >= 75 %}porcentaje-alto
+                    {% elif registro.porcentaje >= 50 %}porcentaje-medio
+                    {% else %}porcentaje-bajo{% endif %}
+                ">
+                    {{ registro.porcentaje }}%
+                </td>
+            </tr>
+            <tr>
+                <td colspan="4" style="padding: 0;">
+                    <div class="detalle-alumnos" id="detalle-{{ loop.index }}">
+                        <table class="tabla-alumnos">
+                            <thead>
+                                <tr>
+                                    <th>Nombre</th>
+                                    <th>RUT</th>
+                                    <th>Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if registro.alumnos %}
+                                    {% for alumno in registro.alumnos %}
+                                    <tr>
+                                        <td>{{ alumno.nombre }}</td>
+                                        <td>{{ alumno.rut }}</td>
+                                        <td class="{% if alumno.presente %}alumno-presente{% else %}alumno-ausente{% endif %}">
+                                            {{ '✓ Presente' if alumno.presente else '✗ Ausente' }}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="3" class="sin-registros">No hay registros de alumnos para esta fecha</td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="sin-registros">
+        No hay registros de asistencia para esta clase
+    </div>
+    {% endif %}
+</div>
+
+<!-- Modal para detalles -->
+<div id="detalleModal" class="modal">
+    <div class="modal-content">
+        <span class="close-button" onclick="cerrarModal()">&times;</span>
+        <h3 id="modalTitle" style="text-align: center; margin-bottom: 20px; font-size: 1.5rem;"></h3>
+        <div id="modalContent"></div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.toggle-detalle').forEach(row => {
+        row.addEventListener('click', function() {
+            const index = this.dataset.index;
+            const detalle = document.getElementById(`detalle-${index}`);
+            const estaAbierto = detalle.classList.contains('abierto');
+            
+            // Cerrar todos los detalles
+            document.querySelectorAll('.detalle-alumnos').forEach(d => {
+                d.classList.remove('abierto');
+                d.style.maxHeight = null;
+            });
+            document.querySelectorAll('.toggle-detalle').forEach(t => t.classList.remove('abierto'));
+            
+            // Abrir/cerrar el detalle seleccionado
+            if (!estaAbierto) {
+                detalle.classList.add('abierto');
+                this.classList.add('abierto');
+                detalle.style.maxHeight = detalle.scrollHeight + "px";
+            }
+        });
+    });
+});
+
+function cerrarModal() {
+    document.getElementById('detalleModal').style.display = 'none';
+}
+
+// Cerrar modal al hacer clic fuera de él
+window.onclick = function(event) {
+    const modal = document.getElementById('detalleModal');
+    if (event.target == modal) {
+        modal.style.display = 'none';
+    }
+}
+</script>
+{% endblock %} 

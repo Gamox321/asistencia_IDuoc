@@ -140,6 +140,13 @@ def confirmar_asistencia(clase_id):
         with get_db() as conexion:
             cursor = conexion.cursor()
 
+            # Obtener la fecha de la clase
+            cursor.execute("SELECT fecha FROM clase WHERE id = ?", (clase_id,))
+            fecha_clase = cursor.fetchone()
+            if not fecha_clase:
+                flash("La clase especificada no existe.", "error")
+                return redirect(url_for('main.home'))
+
             # Obtener todos los alumnos inscritos en la clase
             cursor.execute("""
                 SELECT alumno.id
@@ -163,18 +170,18 @@ def confirmar_asistencia(clase_id):
                 # Solo marcar como presente si alcanzó el estado "presente" (5 detecciones)
                 presente = estado == 'presente'
 
-                # Verificar si ya existe un registro para este alumno en esta clase y día
+                # Verificar si ya existe un registro para este alumno en esta clase y fecha
                 cursor.execute("""
                     SELECT id FROM asistencia 
-                    WHERE clase_id = ? AND alumno_id = ? AND DATE(timestamp) = DATE('now')
-                """, (clase_id, alumno_id))
+                    WHERE clase_id = ? AND alumno_id = ? AND DATE(timestamp) = DATE(?)
+                """, (clase_id, alumno_id, fecha_clase[0]))
                 asistencia_existente = cursor.fetchone()
 
                 if not asistencia_existente:
                     cursor.execute("""
-                        INSERT INTO asistencia (clase_id, alumno_id, presente)
-                        VALUES (?, ?, ?)
-                    """, (clase_id, alumno_id, presente))
+                        INSERT INTO asistencia (clase_id, alumno_id, presente, timestamp)
+                        VALUES (?, ?, ?, ?)
+                    """, (clase_id, alumno_id, presente, fecha_clase[0]))
                     
                     if presente:
                         presentes += 1
@@ -420,6 +427,163 @@ def guardar_datos_faciales(alumno_id, datos_rostro):
             print(f"Error al guardar datos faciales: {e}")
             conexion.rollback()
             raise
+
+# ---------- HISTORIAL DE ASISTENCIA ----------
+@bp.route('/historial_asistencia/<int:clase_id>')
+def historial_asistencia(clase_id):
+    if 'usuario' not in session:
+        return redirect(url_for('main.login'))
+
+    try:
+        with get_db() as conexion:
+            cursor = conexion.cursor()
+            
+            # Verificar si la clase existe
+            cursor.execute("SELECT nombre FROM clase WHERE id = ?", (clase_id,))
+            clase = cursor.fetchone()
+            if not clase:
+                flash("La clase especificada no existe.", "error")
+                return redirect(url_for('main.home'))
+                
+            nombre_clase = clase[0]
+            
+            # Verificar alumnos en la clase
+            cursor.execute("""
+                SELECT COUNT(*) FROM alumno_clase WHERE clase_id = ?
+            """, (clase_id,))
+            total_alumnos = cursor.fetchone()[0]
+            
+            if total_alumnos == 0:
+                flash("No hay alumnos registrados en esta clase.", "info")
+                return render_template('historial_asistencia.html', 
+                                    registros=[],
+                                    nombre_clase=nombre_clase)
+            
+            # Obtener todas las fechas con asistencia para esta clase
+            cursor.execute("""
+                SELECT DISTINCT DATE(timestamp) 
+                FROM asistencia 
+                WHERE clase_id = ? 
+                ORDER BY DATE(timestamp) DESC
+            """, (clase_id,))
+            fechas = cursor.fetchall()
+            
+            registros = []
+            for fecha in fechas:
+                # Primero obtener el total real de alumnos en la clase
+                cursor.execute("""
+                    SELECT COUNT(DISTINCT alumno_id) 
+                    FROM alumno_clase 
+                    WHERE clase_id = ?
+                """, (clase_id,))
+                total_real_alumnos = cursor.fetchone()[0]
+
+                # Luego obtener los detalles de asistencia
+                cursor.execute("""
+                    SELECT 
+                        strftime('%d/%m/%Y', ?) as fecha,
+                        COUNT(DISTINCT ac.alumno_id) as total_alumnos,
+                        SUM(CASE WHEN a.presente = 1 THEN 1 ELSE 0 END) as asistentes,
+                        al.nombre,
+                        al.rut,
+                        COALESCE(a.presente, 0) as presente
+                    FROM alumno_clase ac
+                    JOIN alumno al ON ac.alumno_id = al.id
+                    LEFT JOIN asistencia a ON 
+                        ac.alumno_id = a.alumno_id 
+                        AND ac.clase_id = a.clase_id 
+                        AND DATE(a.timestamp) = ?
+                    WHERE ac.clase_id = ?
+                    GROUP BY al.id, al.nombre, al.rut, a.presente
+                    ORDER BY al.nombre
+                """, (fecha[0], fecha[0], clase_id))
+                
+                rows = cursor.fetchall()
+                if rows:
+                    fecha_str = rows[0][0]
+                    asistentes = sum(1 for row in rows if row[5] == 1)  # Contar solo los presentes
+                    
+                    # Procesar los detalles de cada alumno
+                    alumnos_detalle = []
+                    for row in rows:
+                        alumno_dict = {
+                            'nombre': row[3],
+                            'rut': row[4],
+                            'presente': bool(row[5])
+                        }
+                        alumnos_detalle.append(alumno_dict)
+                    
+                    # Calcular porcentaje usando el total real de alumnos
+                    porcentaje = round((asistentes / total_real_alumnos) * 100, 1) if total_real_alumnos > 0 else 0
+                    
+                    registros.append({
+                        'fecha': fecha_str,
+                        'total_alumnos': total_real_alumnos,  # Usar el total real de alumnos
+                        'asistentes': asistentes,
+                        'porcentaje': porcentaje,
+                        'alumnos': sorted(alumnos_detalle, key=lambda x: x['nombre'])
+                    })
+
+            if not registros:
+                flash("No hay registros de asistencia para esta clase.", "info")
+            
+            return render_template('historial_asistencia.html', 
+                                registros=registros,
+                                nombre_clase=nombre_clase)
+    
+    except Exception as e:
+        import traceback
+        print(f"Error en historial_asistencia: {str(e)}")
+        print(traceback.format_exc())
+        flash(f"Error al cargar el historial: {str(e)}", "error")
+        return redirect(url_for('main.home'))
+
+@bp.route('/detalle_asistencia/<int:clase_id>/<fecha>')
+def detalle_asistencia(clase_id, fecha):
+    if 'usuario' not in session:
+        return {"error": "No autorizado"}, 401
+
+    try:
+        with get_db() as conexion:
+            cursor = conexion.cursor()
+            
+            # Obtener información de la clase
+            cursor.execute("SELECT nombre FROM clase WHERE id = ?", (clase_id,))
+            nombre_clase = cursor.fetchone()[0]
+            
+            # Convertir la fecha al formato correcto para la consulta
+            fecha_partes = fecha.split('/')
+            fecha_sql = f"{fecha_partes[2]}-{fecha_partes[1]}-{fecha_partes[0]}"
+            
+            # Obtener detalles de asistencia para cada alumno usando strftime para comparación de fechas
+            cursor.execute("""
+                SELECT 
+                    a.nombre,
+                    a.rut,
+                    COALESCE(ast.presente, 0) as presente
+                FROM alumno a
+                JOIN alumno_clase ac ON a.id = ac.alumno_id
+                LEFT JOIN asistencia ast ON 
+                    a.id = ast.alumno_id 
+                    AND ast.clase_id = ?
+                    AND strftime('%Y-%m-%d', ast.timestamp) = ?
+                WHERE ac.clase_id = ?
+                ORDER BY a.nombre
+            """, (clase_id, fecha_sql, clase_id))
+            
+            alumnos = [{
+                'nombre': row[0],
+                'rut': row[1],
+                'presente': bool(row[2])
+            } for row in cursor.fetchall()]
+
+            return {
+                'nombre_clase': nombre_clase,
+                'alumnos': alumnos
+            }
+            
+    except Exception as e:
+        return {"error": str(e)}, 500
 
 # ---------- RUTA RESERVADA PARA FUTURO USO ----------
 @bp.route('/listar_alumnos/<int:clase_id>', methods=['GET'])
