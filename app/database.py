@@ -1,41 +1,55 @@
-import sqlite3
+import mysql.connector
+from mysql.connector import Error
+from contextlib import contextmanager
 import os
 from .config import Config
 
 class Database:
     def __init__(self):
-        self.db_path = Config.DATABASE_PATH
+        self.config = {
+            'host': Config.MYSQL_HOST,
+            'port': Config.MYSQL_PORT,
+            'user': Config.MYSQL_USER,
+            'password': Config.MYSQL_PASSWORD,
+            'database': Config.MYSQL_DATABASE
+        }
 
+    @contextmanager
     def get_connection(self):
-        """Obtener una conexión a la base de datos"""
-        return sqlite3.connect(self.db_path)
-
-    def init_db(self):
-        """Inicializar la base de datos con todas las tablas necesarias"""
-        with open(os.path.join(os.path.dirname(__file__), 'schema.sql'), 'r') as f:
-            schema = f.read()
-
-        conn = self.get_connection()
+        """Obtener una conexión a la base de datos usando context manager"""
+        conn = None
         try:
-            cursor = conn.cursor()
-            # Ejecutar el schema completo
-            cursor.executescript(schema)
-            conn.commit()
-            print(f"Base de datos inicializada correctamente en '{self.db_path}'")
-        except sqlite3.Error as e:
-            print(f"Error al inicializar la base de datos: {e}")
-            conn.rollback()
+            conn = mysql.connector.connect(**self.config)
+            yield conn
+        except Error as e:
+            print(f"Error al conectar a MySQL: {e}")
             raise
         finally:
-            conn.close()
+            if conn and conn.is_connected():
+                conn.close()
 
-    def get_db(self):
-        """Obtener una conexión a la base de datos con control de contexto"""
-        conn = self.get_connection()
-        try:
-            yield conn
-        finally:
-            conn.close()
+    def execute_query(self, query, params=None):
+        """Ejecutar una consulta y devolver los resultados"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor(dictionary=True)
+            try:
+                cursor.execute(query, params or ())
+                if query.strip().upper().startswith('SELECT'):
+                    return cursor.fetchall()
+                conn.commit()
+                return cursor.lastrowid
+            finally:
+                cursor.close()
+
+    def execute_many(self, query, params_list):
+        """Ejecutar una consulta múltiples veces con diferentes parámetros"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.executemany(query, params_list)
+                conn.commit()
+            finally:
+                cursor.close()
 
 # Instancia global de la base de datos
 db = Database()

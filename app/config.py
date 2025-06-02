@@ -1,4 +1,8 @@
 import os
+from dotenv import load_dotenv
+
+# Cargar variables de entorno desde .env
+load_dotenv()
 
 # Configuración base
 class Config:
@@ -11,12 +15,22 @@ class Config:
     # Asegurarse de que el directorio data existe
     os.makedirs(DATA_DIR, exist_ok=True)
     
-    # Ruta de la base de datos (asegurarse de que no se duplique la ruta)
+    # Configuración de base de datos
+    DB_TYPE = os.getenv('DB_TYPE', 'mysql')  # 'mysql' o 'sqlite'
+    
+    # Configuración SQLite (legacy)
     DATABASE_NAME = 'asistencia.db'
     DATABASE_PATH = os.path.join(DATA_DIR, DATABASE_NAME)
     
+    # Configuración MySQL
+    MYSQL_HOST = os.getenv('MYSQL_HOST', 'localhost')
+    MYSQL_PORT = int(os.getenv('MYSQL_PORT', 3306))
+    MYSQL_USER = os.getenv('MYSQL_USER', 'root')
+    MYSQL_PASSWORD = os.getenv('MYSQL_PASSWORD', 'elcrepublica')
+    MYSQL_DATABASE = os.getenv('MYSQL_DATABASE', 'asistencia_duoc')
+    
     # Clave secreta para la aplicación
-    SECRET_KEY = 'clave-secreta'  # En producción, usar variable de entorno
+    SECRET_KEY = os.getenv('SECRET_KEY', 'clave-secreta')
     
     # Configuración de la aplicación
     UPLOAD_FOLDER = os.path.join(DATA_DIR, 'uploads')
@@ -35,4 +49,4 @@ class Config:
         # Imprimir rutas para debugging
         print(f"Directorio de datos: {cls.DATA_DIR}")
         print(f"Ruta de la base de datos: {cls.DATABASE_PATH}")
-        print(f"Directorio de uploads: {cls.UPLOAD_FOLDER}") 
+        print(f"Directorio de uploads: {cls.UPLOAD_FOLDER}")
