@@ -152,6 +152,24 @@
         color: #2c3e50;
     }
 
+    .text-muted {
+        color: #7f8c8d;
+        font-size: 0.85rem;
+    }
+
+    .badge {
+        display: inline-block;
+        padding: 4px 8px;
+        font-size: 0.8rem;
+        font-weight: 500;
+        border-radius: 4px;
+    }
+
+    .badge-info {
+        background-color: #3498db;
+        color: white;
+    }
+
     @media (max-width: 768px) {
         .acciones {
             flex-direction: column;
@@ -176,7 +194,7 @@
         <select id="filtro-clase" class="input-buscador">
             <option value="todas">Todas las clases</option>
             {% for clase in clases %}
-                <option value="{{ clase[1] | lower | replace(' ', '-') }}">{{ clase[1] }}</option>
+                <option value="{{ clase.nombre | lower | replace(' ', '-') }}">{{ clase.nombre }}</option>
             {% endfor %}
         </select>
     </div>
@@ -187,27 +205,40 @@
             <tr>
                 <th>📘 Nombre</th>
                 <th>📅 Fecha</th>
+                <th>🏫 Sala</th>
+                <th>⏰ Horario</th>
+                <th>👥 Alumnos</th>
                 <th>⚙️ Acciones</th>
             </tr>
         </thead>
         <tbody>
             {% for clase in clases %}
-            <tr class="fila-clase" data-nombre="{{ clase[1] | lower | replace(' ', '-') }}">
+            <tr class="fila-clase" data-nombre="{{ clase.nombre | lower | replace(' ', '-') }}">
                 <td>
-                    <span class="nombre-clase">{{ clase[1] }}</span>
+                    <span class="nombre-clase">{{ clase.nombre }}</span><br>
+                    <small class="text-muted">Sección: {{ clase.seccion_codigo }}</small>
                 </td>
                 <td>
-                    <span class="fecha">{{ clase[2] }}</span>
+                    <span class="fecha">{{ clase.fecha }}</span>
+                </td>
+                <td>
+                    <span>{{ clase.sala or 'N/A' }}</span>
+                </td>
+                <td>
+                    <span>{{ clase.hora_inicio }} - {{ clase.hora_fin }}</span>
+                </td>
+                <td>
+                    <span class="badge badge-info">{{ clase.total_alumnos }} alumnos</span>
                 </td>
                 <td>
                     <div class="acciones">
-                        <a href="{{ url_for('main.asistencia', clase_id=clase[0]) }}" class="btn btn-asistencia">
+                        <a href="{{ url_for('main.asistencia', clase_id=clase.id) }}" class="btn btn-asistencia">
                             ✅ Asistencia
                         </a>
-                        <a href="{{ url_for('main.ingresar_alumno', clase_id=clase[0]) }}" class="btn btn-ingresar">
+                        <a href="{{ url_for('main.ingresar_alumno', clase_id=clase.id) }}" class="btn btn-ingresar">
                             📝 Ingresar Alumno
                         </a>
-                        <a href="{{ url_for('main.historial_asistencia', clase_id=clase[0]) }}" class="btn btn-ver">
+                        <a href="{{ url_for('main.historial_asistencia', clase_id=clase.id) }}" class="btn btn-ver">
                             📊 Ver Historial
                         </a>
                     </div>

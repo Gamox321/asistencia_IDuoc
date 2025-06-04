@@ -1,7 +1,9 @@
 from flask import Flask
 from .config import Config
-from .database import init_app
+from .database import init_app as init_db
+from .auth import SecurityManager
 import os
+from datetime import timedelta
 
 def create_app(test_config=None):
     # Crear la instancia de la aplicación
@@ -29,11 +31,42 @@ def create_app(test_config=None):
         pass
 
     # Inicializar la base de datos
-    init_app(app)
+    init_db(app)
+    SecurityManager.init_app(app)
 
     # Configurar la clave secreta para las sesiones
     if not app.config.get('SECRET_KEY'):
         app.config['SECRET_KEY'] = os.urandom(24)
+
+    # Registrar filtros de template personalizados
+    @app.template_filter('time_format')
+    def time_format(value):
+        """Convertir timedelta o datetime a formato HH:MM"""
+        if value is None:
+            return ""
+        
+        if isinstance(value, timedelta):
+            # Convertir timedelta a formato de tiempo
+            total_seconds = int(value.total_seconds())
+            hours = total_seconds // 3600
+            minutes = (total_seconds % 3600) // 60
+            return f"{hours:02d}:{minutes:02d}"
+        else:
+            # Si es datetime o time, usar strftime
+            try:
+                return value.strftime('%H:%M')
+            except:
+                return str(value)
+    
+    @app.template_filter('date_format')
+    def date_format(value, format='%d/%m/%Y'):
+        """Formatear fechas de manera segura"""
+        if value is None:
+            return ""
+        try:
+            return value.strftime(format)
+        except:
+            return str(value)
 
     # Registrar el Blueprint principal
     from .routes import bp as main_bp
@@ -55,5 +88,11 @@ def create_app(test_config=None):
         response.headers['X-Frame-Options'] = 'SAMEORIGIN'
         response.headers['X-XSS-Protection'] = '1; mode=block'
         return response
+
+    # Configuraciones de seguridad para sesiones
+    app.config['SESSION_COOKIE_SECURE'] = False  # True en producción con HTTPS
+    app.config['SESSION_COOKIE_HTTPONLY'] = True
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+    app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 hora
 
     return app 

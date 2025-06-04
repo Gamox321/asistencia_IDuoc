@@ -46,9 +46,12 @@
         </a>
         <span class="text-lg font-semibold">IDuoc Asistencia</span>
     </div>
-    <div class="space-x-4">
+    <div class="flex items-center space-x-4">
         {% if session.get('usuario') %}
-            <span class="text-sm">{{ session['usuario'] }}</span>
+            <a href="{{ url_for('main.dashboard') }}" class="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm transition">
+                📊 Dashboard
+            </a>
+            <span class="text-sm">Hola, {{ nombre_profesor or session['usuario'] }}</span>
             <a href="{{ url_for('main.logout') }}" class="hover:underline text-sm">Cerrar sesión</a>
         {% endif %}
     </div>
@@ -61,20 +64,78 @@
         <p class="text-lg text-gray-700">Administra clases, registra alumnos y lleva el control de asistencia con facilidad.</p>
     </section>
 
-    <section class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6" data-aos="fade-up">
-        <a href="{{ url_for('main.ver_clases') }}" class="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition">
+    <!-- Mensaje de bienvenida personalizado -->
+    {% if session.get('usuario') %}
+    <section class="mb-8" data-aos="fade-up">
+        <div class="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-6 rounded-xl shadow-lg">
+            <h2 class="text-2xl font-bold mb-2">¡Hola, {{ nombre_profesor or session['usuario'] }}! 👋</h2>
+            <p class="text-blue-100">Selecciona una opción para comenzar a trabajar con tus clases.</p>
+        </div>
+    </section>
+    {% endif %}
+
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6" data-aos="fade-up">
+        <!-- Dashboard -->
+        <a href="{{ url_for('main.dashboard') }}" class="bg-gradient-to-br from-purple-500 to-blue-600 text-white p-6 rounded-xl shadow-md hover:shadow-lg transition transform hover:scale-105">
+            <h2 class="text-xl font-semibold mb-2">📊 Dashboard</h2>
+            <p class="text-purple-100">Ve estadísticas y reportes de asistencia en tiempo real.</p>
+        </a>
+        
+        <!-- Ver Clases -->
+        <a href="{{ url_for('main.ver_clases') }}" class="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition transform hover:scale-105">
             <h2 class="text-xl font-semibold mb-2">📚 Ver Mis Clases</h2>
             <p class="text-gray-600">Accede a la lista de tus clases y gestiona cada una fácilmente.</p>
         </a>
-        <a href="{{ url_for('main.ver_clases') }}" class="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition">
-            <h2 class="text-xl font-semibold mb-2">✅ Pasar Asistencia</h2>
-            <p class="text-gray-600">Selecciona una clase para registrar asistencia mediante reconocimiento facial.</p>
+        
+        <!-- Pasar Asistencia -->
+        <a href="{{ url_for('main.ver_clases') }}" class="bg-green-50 p-6 rounded-xl shadow-md hover:shadow-lg transition transform hover:scale-105 border border-green-200">
+            <h2 class="text-xl font-semibold mb-2 text-green-800">✅ Pasar Asistencia</h2>
+            <p class="text-green-600">Registra asistencia mediante reconocimiento facial.</p>
         </a>
-        <a href="{{ url_for('main.ver_clases') }}" class="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition">
-            <h2 class="text-xl font-semibold mb-2">📊 Historial de Asistencia</h2>
-            <p class="text-gray-600">Selecciona una clase para ver su historial de asistencias.</p>
+        
+        <!-- Reportes -->
+        <a href="{{ url_for('main.reportes') }}" class="bg-orange-50 p-6 rounded-xl shadow-md hover:shadow-lg transition transform hover:scale-105 border border-orange-200">
+            <h2 class="text-xl font-semibold mb-2 text-orange-800">📈 Reportes</h2>
+            <p class="text-orange-600">Genera y exporta reportes de asistencia detallados.</p>
         </a>
     </section>
+
+    <!-- Resumen rápido de clases -->
+    {% if clases %}
+    <section class="mt-10" data-aos="fade-up">
+        <h2 class="text-2xl font-bold mb-4">Tus Próximas Clases</h2>
+        <div class="bg-white rounded-xl shadow-md p-6">
+            <div class="space-y-4">
+                {% for clase in clases[:3] %}
+                <div class="flex justify-between items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
+                    <div>
+                        <h3 class="font-semibold">{{ clase.nombre }}</h3>
+                        <p class="text-sm text-gray-600">Sección: {{ clase.seccion_codigo }}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-sm font-medium">{{ clase.fecha|date_format }}</p>
+                        <p class="text-sm text-gray-500">{{ clase.hora_inicio|time_format }} - {{ clase.hora_fin|time_format }}</p>
+                    </div>
+                    <div>
+                        <a href="{{ url_for('main.asistencia', clase_id=clase.id) }}" 
+                           class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm">
+                            Pasar Lista
+                        </a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% if clases|length > 3 %}
+            <div class="mt-4 text-center">
+                <a href="{{ url_for('main.ver_clases') }}" 
+                   class="text-blue-600 hover:text-blue-800 font-medium">
+                    Ver todas las clases ({{ clases|length - 3 }} más)
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </section>
+    {% endif %}
 </div>
 
 </body>
