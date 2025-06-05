@@ -150,12 +150,12 @@ def admin_required(f):
         if 'usuario' not in session:
             print("DEBUG Admin Required - No user in session")
             flash('Por favor inicie sesión', 'warning')
-            return redirect(url_for('auth.login'))
+            return redirect(url_for('main.login'))
             
         if not session.get('es_admin'):
             print(f"DEBUG Admin Required - User is not admin. es_admin={session.get('es_admin')}")
             flash('No tienes permisos de administrador', 'error')
-            return redirect(url_for('main.dashboard'))
+            return redirect(url_for('main.home'))
             
         print("DEBUG Admin Required - Access granted")
         return f(*args, **kwargs)
@@ -167,7 +167,7 @@ def coordinator_required(f):
     def decorated_function(*args, **kwargs):
         if 'usuario' not in session:
             flash('Por favor inicie sesión', 'warning')
-            return redirect(url_for('auth.login'))
+            return redirect(url_for('main.login'))
             
         try:
             with db.get_connection() as conexion:
@@ -181,12 +181,12 @@ def coordinator_required(f):
                 result = cursor.fetchone()
                 if not result or not result['es_coordinador']:
                     flash('No tienes permisos de coordinador', 'error')
-                    return redirect(url_for('main.dashboard'))
+                    return redirect(url_for('main.home'))
                     
         except Exception as e:
             print(f"Error verificando rol coordinador: {e}")
             flash('Error verificando permisos', 'error')
-            return redirect(url_for('main.dashboard'))
+            return redirect(url_for('main.home'))
             
         return f(*args, **kwargs)
     return decorated_function
@@ -197,7 +197,7 @@ def professor_required(f):
     def decorated_function(*args, **kwargs):
         if 'usuario' not in session:
             flash('Por favor inicie sesión', 'warning')
-            return redirect(url_for('auth.login'))
+            return redirect(url_for('main.login'))
             
         try:
             profesor_id = session.get('profesor_id')

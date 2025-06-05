@@ -1,4 +1,11 @@
-import face_recognition
+# Importación opcional de face_recognition
+try:
+    import face_recognition
+    FACE_RECOGNITION_AVAILABLE = True
+except ImportError:
+    FACE_RECOGNITION_AVAILABLE = False
+    print("⚠️ face_recognition no está disponible. Funcionalidad de reconocimiento facial deshabilitada.")
+
 import pickle
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify, send_file
 import mysql.connector
@@ -47,6 +54,17 @@ def timedelta_to_time_string(td):
         except:
             return str(td)
 
+def serialize_safe(obj):
+    """Convertir objetos no serializables a JSON de manera segura"""
+    if isinstance(obj, timedelta):
+        return timedelta_to_time_string(obj)
+    elif isinstance(obj, (date, datetime)):
+        return obj.isoformat()
+    elif hasattr(obj, '__dict__'):
+        return obj.__dict__
+    else:
+        return str(obj)
+
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
@@ -59,7 +77,9 @@ def inject_role_context():
                 'is_admin': False,
                 'is_coordinator': False,
                 'is_professor': False
-            }
+            },
+            'timedelta_to_time': timedelta_to_time_string,
+            'serialize_safe': serialize_safe
         }
     
     return {
@@ -67,7 +87,9 @@ def inject_role_context():
             'is_admin': current_user.is_admin,
             'is_coordinator': current_user.is_coordinator,
             'is_professor': True
-        }
+        },
+        'timedelta_to_time': timedelta_to_time_string,
+        'serialize_safe': serialize_safe
     }
 
 # ---------- RUTAS PÚBLICAS ----------
@@ -445,6 +467,9 @@ def procesar_fotograma(clase_id):
     if 'usuario' not in session:
         return {"mensaje": "No autorizado"}, 401
 
+    if not FACE_RECOGNITION_AVAILABLE:
+        return {"mensaje": "Reconocimiento facial no disponible"}, 503
+
     data = request.get_json()
     imagen_base64 = data.get('imagen')
 
@@ -531,6 +556,9 @@ def ingresar_alumno(clase_id):
                 imagen_file = request.files[key]
                 if imagen_file and imagen_file.filename != '':
                     try:
+                        if not FACE_RECOGNITION_AVAILABLE:
+                            mensaje = "Reconocimiento facial no disponible."
+                            continue
                         imagen = face_recognition.load_image_file(imagen_file)
                         datos_rostro = procesar_imagen(imagen)
                         if datos_rostro is None:
@@ -593,6 +621,9 @@ def capturar_foto(alumno_id):
     if 'usuario' not in session:
         return {"mensaje": "No autorizado"}, 401
 
+    if not FACE_RECOGNITION_AVAILABLE:
+        return {"mensaje": "Reconocimiento facial no disponible"}, 503
+
     data = request.get_json()
     imagen_base64 = data.get('imagen')
 
@@ -634,6 +665,8 @@ def capturar_foto(alumno_id):
 
 def procesar_imagen(imagen):
     """Procesar imagen y extraer datos faciales"""
+    if not FACE_RECOGNITION_AVAILABLE:
+        return None
     try:
         encodings = face_recognition.face_encodings(imagen)
         return pickle.dumps(encodings[0]) if encodings else None
@@ -1344,38 +1377,39 @@ def admin_profesores():
                 accion = request.form.get('accion')
                 
                 if accion == 'crear':
-                    # Crear nuevo profesor y usuario
+                    # Crear nuevo profesor - primero el registro de profesor
                     cursor.execute("""
-                        INSERT INTO usuario (username, password, activo)
-                        VALUES (%s, %s, 1)
+                        INSERT INTO profesor (rut, nombre, apellido_paterno, apellido_materno, 
+                                           usuario, estado)
+                        VALUES (%s, %s, %s, %s, %s, 'activo')
                     """, (
-                        request.form['username'],
-                        generate_password_hash(request.form['password'])
-                    ))
-                    usuario_id = cursor.lastrowid
-                    
-                    cursor.execute("""
-                        INSERT INTO profesor (usuario_id, nombre, apellido_paterno, apellido_materno, 
-                                           rut, email)
-                        VALUES (%s, %s, %s, %s, %s, %s)
-                    """, (
-                        usuario_id,
+                        request.form['rut'],
                         request.form['nombre'],
                         request.form['apellido_paterno'],
                         request.form['apellido_materno'],
-                        request.form['rut'],
-                        request.form['email']
+                        request.form['username']
                     ))
                     profesor_id = cursor.lastrowid
                     
-                    # Asignar roles
+                    # Crear credenciales de autenticación
+                    cursor.execute("""
+                        INSERT INTO autenticacion (usuario, password_hash, tipo_usuario, profesor_id)
+                        VALUES (%s, %s, %s, %s)
+                    """, (
+                        request.form['username'],
+                        generate_password_hash(request.form['password']),
+                        request.form.get('tipo_usuario', 'profesor'),
+                        profesor_id
+                    ))
+                    
+                    # Asignar roles si se especifican
                     if 'roles' in request.form:
                         rol_ids = request.form.getlist('roles')
                         for rol_id in rol_ids:
                             cursor.execute("""
-                                INSERT INTO usuario_rol (usuario_id, rol_id)
-                                VALUES (%s, %s)
-                            """, (usuario_id, rol_id))
+                                INSERT INTO usuario_roles (usuario_id, rol_id, assigned_by)
+                                VALUES (%s, %s, %s)
+                            """, (profesor_id, rol_id, session.get('profesor_id')))
                     
                     conexion.commit()
                     flash('Profesor creado exitosamente', 'success')
@@ -1417,25 +1451,28 @@ def admin_profesores():
                     flash('Profesor actualizado exitosamente', 'success')
                 
                 elif accion == 'eliminar':
-                    # Eliminar profesor y usuario asociado
-                    cursor.execute("SELECT usuario_id FROM profesor WHERE id = %s", 
-                                 (request.form['profesor_id'],))
-                    usuario_id = cursor.fetchone()['usuario_id']
+                    # Eliminar profesor y autenticación asociada
+                    profesor_id = request.form['profesor_id']
                     
-                    cursor.execute("DELETE FROM profesor WHERE id = %s", (request.form['profesor_id'],))
-                    cursor.execute("DELETE FROM usuario WHERE id = %s", (usuario_id,))
+                    # Eliminar autenticación
+                    cursor.execute("DELETE FROM autenticacion WHERE profesor_id = %s", (profesor_id,))
+                    # Eliminar roles asignados
+                    cursor.execute("DELETE FROM usuario_roles WHERE usuario_id = %s", (profesor_id,))
+                    # Eliminar profesor
+                    cursor.execute("DELETE FROM profesor WHERE id = %s", (profesor_id,))
+                    
                     conexion.commit()
                     flash('Profesor eliminado exitosamente', 'success')
             
-            # Obtener lista de profesores
+            # Obtener lista de profesores con la estructura correcta
             cursor.execute("""
-                SELECT p.*, u.username,
+                SELECT p.*, a.usuario as username, a.tipo_usuario,
                        GROUP_CONCAT(DISTINCT r.nombre ORDER BY r.nombre SEPARATOR ',') as roles,
                        COUNT(DISTINCT c.id) as total_clases
                 FROM profesor p
-                JOIN usuario u ON p.usuario_id = u.id
-                LEFT JOIN usuario_rol ur ON u.id = ur.usuario_id
-                LEFT JOIN rol r ON ur.rol_id = r.id
+                LEFT JOIN autenticacion a ON p.id = a.profesor_id
+                LEFT JOIN usuario_roles ur ON p.id = ur.usuario_id
+                LEFT JOIN roles r ON ur.rol_id = r.id
                 LEFT JOIN clase c ON p.id = c.profesor_id
                 GROUP BY p.id
                 ORDER BY p.apellido_paterno, p.nombre
@@ -1443,7 +1480,7 @@ def admin_profesores():
             profesores = cursor.fetchall()
             
             # Obtener roles para el formulario
-            cursor.execute("SELECT * FROM rol ORDER BY nombre")
+            cursor.execute("SELECT * FROM roles ORDER BY nombre")
             roles = cursor.fetchall()
             
             return render_template('admin/profesores.html',
@@ -1466,26 +1503,20 @@ def admin_asistencia():
                 accion = request.form.get('accion')
                 
                 if accion == 'registrar':
-                    # Registrar nueva asistencia
+                    # Registrar nueva asistencia - usando las columnas correctas de la tabla asistencia
                     cursor.execute("""
-                        INSERT INTO asistencia (clase_id, fecha, hora_inicio, hora_fin)
-                        VALUES (%s, %s, %s, %s)
+                        INSERT INTO asistencia (clase_id, alumno_id, fecha_asistencia, presente, timestamp)
+                        VALUES (%s, %s, %s, %s, NOW())
                     """, (
                         request.form['clase_id'],
+                        request.form['alumno_id'],
                         request.form['fecha'],
-                        request.form['hora_inicio'],
-                        request.form['hora_fin']
+                        1  # presente por defecto
                     ))
                     asistencia_id = cursor.lastrowid
                     
-                    # Registrar alumnos presentes
-                    if 'alumnos_presentes' in request.form:
-                        alumno_ids = request.form.getlist('alumnos_presentes')
-                        for alumno_id in alumno_ids:
-                            cursor.execute("""
-                                INSERT INTO alumno_asistencia (alumno_id, asistencia_id)
-                                VALUES (%s, %s)
-                            """, (alumno_id, asistencia_id))
+                    # En este modelo simple, cada registro de asistencia ya tiene alumno_id
+                    # No necesitamos tabla intermedia alumno_asistencia
                     
                     conexion.commit()
                     flash('Asistencia registrada exitosamente', 'success')
@@ -1494,26 +1525,17 @@ def admin_asistencia():
                     # Editar registro de asistencia
                     cursor.execute("""
                         UPDATE asistencia 
-                        SET fecha = %s, hora_inicio = %s, hora_fin = %s
+                        SET fecha_asistencia = %s, presente = %s
                         WHERE id = %s
                     """, (
                         request.form['fecha'],
-                        request.form['hora_inicio'],
-                        request.form['hora_fin'],
+                        1 if request.form.get('presente') == '1' else 0,
                         request.form['asistencia_id']
                     ))
                     
-                    # Actualizar alumnos presentes
-                    cursor.execute("DELETE FROM alumno_asistencia WHERE asistencia_id = %s", 
-                                 (request.form['asistencia_id'],))
-                    
-                    if 'alumnos_presentes' in request.form:
-                        alumno_ids = request.form.getlist('alumnos_presentes')
-                        for alumno_id in alumno_ids:
-                            cursor.execute("""
-                                INSERT INTO alumno_asistencia (alumno_id, asistencia_id)
-                                VALUES (%s, %s)
-                            """, (alumno_id, request.form['asistencia_id']))
+                    # Nota: El modelo de asistencia en esta base de datos es simple
+                    # No necesitamos actualizar tabla alumno_asistencia porque
+                    # asistencia ya tiene alumno_id directamente
                     
                     conexion.commit()
                     flash('Asistencia actualizada exitosamente', 'success')
@@ -1538,34 +1560,33 @@ def admin_asistencia():
                 params.append(request.args.get('profesor_id'))
             
             if request.args.get('fecha_desde'):
-                where_clauses.append("a.fecha >= %s")
+                where_clauses.append("a.fecha_asistencia >= %s")
                 params.append(request.args.get('fecha_desde'))
             
             if request.args.get('fecha_hasta'):
-                where_clauses.append("a.fecha <= %s")
+                where_clauses.append("a.fecha_asistencia <= %s")
                 params.append(request.args.get('fecha_hasta'))
             
             where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
             
-            # Obtener lista de asistencias
+            # Obtener lista de asistencias con las columnas correctas
             cursor.execute(f"""
                 SELECT a.*, c.nombre as clase_nombre, s.codigo as seccion_codigo,
                        p.nombre as profesor_nombre, p.apellido_paterno as profesor_apellido,
-                       COUNT(DISTINCT aa.alumno_id) as alumnos_presentes,
-                       (SELECT COUNT(*) FROM alumno_clase ac WHERE ac.clase_id = c.id) as total_alumnos,
+                       al.nombre as alumno_nombre, al.apellido_paterno as alumno_apellido,
+                       a.presente,
                        CASE 
-                           WHEN a.fecha > CURDATE() THEN 'Pendiente'
-                           WHEN a.fecha = CURDATE() AND a.hora_fin > CURRENT_TIME() THEN 'En Curso'
+                           WHEN a.fecha_asistencia > CURDATE() THEN 'Pendiente'
+                           WHEN a.fecha_asistencia = CURDATE() THEN 'En Curso'
                            ELSE 'Completada'
                        END as estado
                 FROM asistencia a
                 JOIN clase c ON a.clase_id = c.id
                 JOIN seccion s ON c.seccion_id = s.id
                 JOIN profesor p ON c.profesor_id = p.id
-                LEFT JOIN alumno_asistencia aa ON a.id = aa.asistencia_id
+                JOIN alumno al ON a.alumno_id = al.id
                 WHERE {where_sql}
-                GROUP BY a.id
-                ORDER BY a.fecha DESC, a.hora_inicio DESC
+                ORDER BY a.fecha_asistencia DESC, a.timestamp DESC
             """, params)
             asistencias = cursor.fetchall()
             

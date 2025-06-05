@@ -1,4 +1,11 @@
-import face_recognition
+# Importación opcional de face_recognition
+try:
+    import face_recognition
+    FACE_RECOGNITION_AVAILABLE = True
+except ImportError:
+    FACE_RECOGNITION_AVAILABLE = False
+    print("⚠️ face_recognition no está disponible en facial_recognition.py")
+
 import numpy as np
 import cv2
 from typing import Tuple, List, Optional
@@ -16,6 +23,8 @@ class FacialRecognition:
         image_data: string base64 de la imagen
         student_id: identificador del estudiante
         """
+        if not FACE_RECOGNITION_AVAILABLE:
+            return False
         try:
             # Convertir base64 a imagen
             image_data = re.sub('^data:image/.+;base64,', '', image_data)
@@ -49,6 +58,8 @@ class FacialRecognition:
         image_data: string base64 de la imagen
         Retorna: ID del estudiante si se encuentra una coincidencia, None en caso contrario
         """
+        if not FACE_RECOGNITION_AVAILABLE:
+            return None
         try:
             # Convertir base64 a imagen
             image_data = re.sub('^data:image/.+;base64,', '', image_data)

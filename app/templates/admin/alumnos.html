@@ -101,10 +101,11 @@
                             </div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <button onclick="openModal('modalEditarAlumno', {{ alumno|tojson }})" class="text-indigo-600 hover:text-indigo-900 mr-3">
+                            <button onclick="editarAlumno('{{ alumno.id }}', '{{ alumno.nombre }}', '{{ alumno.apellido_paterno }}', '{{ alumno.apellido_materno }}', '{{ alumno.rut }}', '{{ alumno.email }}')" 
+                                    class="text-indigo-600 hover:text-indigo-900 mr-3" title="Editar alumno">
                                 <i class="fas fa-edit"></i>
                             </button>
-                            <button onclick="confirmarEliminar({{ alumno.id }})" class="text-red-600 hover:text-red-900">
+                            <button onclick="confirmarEliminar({{ alumno.id }})" class="text-red-600 hover:text-red-900" title="Eliminar alumno">
                                 <i class="fas fa-trash"></i>
                             </button>
                         </td>
@@ -125,30 +126,39 @@
             <form action="{{ url_for('main.admin_alumnos') }}" method="POST">
                 <input type="hidden" name="accion" value="crear">
                 <div class="modal-body">
-                    <div class="grid grid-cols-1 gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">Nombre</label>
-                            <input type="text" name="nombre" required class="mt-1 form-input">
+                            <label class="form-label">Nombre</label>
+                            <input type="text" name="nombre" required class="form-input">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">Apellido Paterno</label>
-                            <input type="text" name="apellido_paterno" required class="mt-1 form-input">
+                            <label class="form-label">Apellido Paterno</label>
+                            <input type="text" name="apellido_paterno" required class="form-input">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">Apellido Materno</label>
-                            <input type="text" name="apellido_materno" required class="mt-1 form-input">
+                            <label class="form-label">Apellido Materno</label>
+                            <input type="text" name="apellido_materno" required class="form-input">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">RUT</label>
-                            <input type="text" name="rut" required class="mt-1 form-input" placeholder="12345678-9">
+                            <label class="form-label">RUT</label>
+                            <input type="text" name="rut" required class="form-input" placeholder="12345678-9">
                         </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Email</label>
-                            <input type="email" name="email" required class="mt-1 form-input">
+                        <div class="md:col-span-2">
+                            <label class="form-label">Email</label>
+                            <input type="email" name="email" required class="form-input">
                         </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Clases</label>
-                            <select name="clase_ids" multiple class="mt-1 form-multiselect" size="3">
+                        <div class="md:col-span-2">
+                            <label class="form-label">Carrera</label>
+                            <select name="carrera_id" class="form-select">
+                                <option value="">Seleccionar carrera</option>
+                                {% for carrera in carreras %}
+                                <option value="{{ carrera.id }}">{{ carrera.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="form-label">Clases (Opcional)</label>
+                            <select name="clase_ids" multiple class="form-multiselect" size="4">
                                 {% for clase in clases %}
                                 <option value="{{ clase.id }}">{{ clase.nombre }} ({{ clase.seccion_codigo }})</option>
                                 {% endfor %}
@@ -176,26 +186,26 @@
                 <input type="hidden" name="accion" value="editar">
                 <input type="hidden" name="alumno_id" id="editAlumnoId">
                 <div class="modal-body">
-                    <div class="grid grid-cols-1 gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">Nombre</label>
-                            <input type="text" name="nombre" id="editNombre" required class="mt-1 form-input">
+                            <label class="form-label">Nombre</label>
+                            <input type="text" name="nombre" id="editNombre" required class="form-input">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">Apellido Paterno</label>
-                            <input type="text" name="apellido_paterno" id="editApellidoPaterno" required class="mt-1 form-input">
+                            <label class="form-label">Apellido Paterno</label>
+                            <input type="text" name="apellido_paterno" id="editApellidoPaterno" required class="form-input">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">Apellido Materno</label>
-                            <input type="text" name="apellido_materno" id="editApellidoMaterno" required class="mt-1 form-input">
+                            <label class="form-label">Apellido Materno</label>
+                            <input type="text" name="apellido_materno" id="editApellidoMaterno" required class="form-input">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">RUT</label>
-                            <input type="text" name="rut" id="editRut" required class="mt-1 form-input">
+                            <label class="form-label">RUT</label>
+                            <input type="text" name="rut" id="editRut" required class="form-input">
                         </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Email</label>
-                            <input type="email" name="email" id="editEmail" required class="mt-1 form-input">
+                        <div class="md:col-span-2">
+                            <label class="form-label">Email</label>
+                            <input type="email" name="email" id="editEmail" required class="form-input">
                         </div>
                     </div>
                 </div>
@@ -207,27 +217,35 @@
         </div>
     </div>
 </div>
+{% endblock %}
 
-<!-- Scripts -->
+{% block scripts %}
 <script>
-function openModal(modalId, data = null) {
+function openModal(modalId) {
     document.getElementById(modalId).style.display = 'block';
-    if (data && modalId === 'modalEditarAlumno') {
-        document.getElementById('editAlumnoId').value = data.id;
-        document.getElementById('editNombre').value = data.nombre;
-        document.getElementById('editApellidoPaterno').value = data.apellido_paterno;
-        document.getElementById('editApellidoMaterno').value = data.apellido_materno;
-        document.getElementById('editRut').value = data.rut;
-        document.getElementById('editEmail').value = data.email;
-    }
+    document.body.style.overflow = 'hidden'; // Prevenir scroll del body
 }
 
 function closeModal(modalId) {
     document.getElementById(modalId).style.display = 'none';
+    document.body.style.overflow = 'auto'; // Restaurar scroll del body
+}
+
+function editarAlumno(id, nombre, apellidoPaterno, apellidoMaterno, rut, email) {
+    // Abrir modal de edición
+    openModal('modalEditarAlumno');
+    
+    // Llenar los campos con los datos del alumno
+    document.getElementById('editAlumnoId').value = id;
+    document.getElementById('editNombre').value = nombre;
+    document.getElementById('editApellidoPaterno').value = apellidoPaterno;
+    document.getElementById('editApellidoMaterno').value = apellidoMaterno;
+    document.getElementById('editRut').value = rut;
+    document.getElementById('editEmail').value = email;
 }
 
 function confirmarEliminar(alumnoId) {
-    if (confirm('¿Estás seguro de que deseas eliminar este alumno?')) {
+    if (confirm('¿Estás seguro de que deseas eliminar este alumno?\n\nEsta acción no se puede deshacer.')) {
         const form = document.createElement('form');
         form.method = 'POST';
         form.action = "{{ url_for('main.admin_alumnos') }}";
@@ -252,9 +270,19 @@ function confirmarEliminar(alumnoId) {
 // Cerrar modal al hacer clic fuera de él
 window.onclick = function(event) {
     if (event.target.classList.contains('modal')) {
-        event.target.style.display = 'none';
+        closeModal(event.target.id);
     }
 }
+
+// Cerrar modal con tecla Escape
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        const openModals = document.querySelectorAll('.modal[style*="block"]');
+        openModals.forEach(modal => {
+            closeModal(modal.id);
+        });
+    }
+});
 </script>
 
 <style>
@@ -267,24 +295,29 @@ window.onclick = function(event) {
     width: 100%;
     height: 100%;
     background-color: rgba(0,0,0,0.5);
+    overflow-y: auto; /* Permitir scroll en el modal */
 }
 
 .modal-content {
     background-color: white;
-    margin: 10% auto;
+    margin: 2% auto;
     padding: 0;
-    width: 90%;
-    max-width: 600px;
-    border-radius: 0.5rem;
+    width: 95%;
+    max-width: 700px;
+    border-radius: 0.75rem;
     box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+    max-height: 95vh;
+    overflow-y: auto; /* Scroll interno si es necesario */
 }
 
 .modal-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 1rem 1.5rem;
+    padding: 1.25rem 1.5rem;
     border-bottom: 1px solid #e5e7eb;
+    background-color: #f9fafb;
+    border-radius: 0.75rem 0.75rem 0 0;
 }
 
 .modal-close {
@@ -294,43 +327,62 @@ window.onclick = function(event) {
     cursor: pointer;
     border: none;
     background: transparent;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.375rem;
+    transition: background-color 0.15s ease-in-out;
+}
+
+.modal-close:hover {
+    background-color: #e5e7eb;
+    color: #374151;
 }
 
 .modal-body {
     padding: 1.5rem;
+    max-height: 60vh;
+    overflow-y: auto;
 }
 
 .modal-footer {
     padding: 1rem 1.5rem;
     border-top: 1px solid #e5e7eb;
+    background-color: #f9fafb;
     display: flex;
     justify-content: flex-end;
-    gap: 0.5rem;
+    gap: 0.75rem;
+    border-radius: 0 0 0.75rem 0.75rem;
 }
 
 .btn-primary {
     display: inline-flex;
     align-items: center;
-    padding: 0.5rem 1rem;
-    border-radius: 0.375rem;
+    padding: 0.625rem 1.25rem;
+    border-radius: 0.5rem;
     font-weight: 500;
     color: white;
-    background-color: #4f46e5;
+    background-color: #3b82f6;
     border: 1px solid transparent;
     box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
     cursor: pointer;
     transition: all 0.15s ease-in-out;
+    text-decoration: none;
 }
 
 .btn-primary:hover {
-    background-color: #4338ca;
+    background-color: #2563eb;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
 .btn-secondary {
     display: inline-flex;
     align-items: center;
-    padding: 0.5rem 1rem;
-    border-radius: 0.375rem;
+    padding: 0.625rem 1.25rem;
+    border-radius: 0.5rem;
     font-weight: 500;
     color: #374151;
     background-color: white;
@@ -342,29 +394,47 @@ window.onclick = function(event) {
 
 .btn-secondary:hover {
     background-color: #f3f4f6;
+    border-color: #9ca3af;
 }
 
-.form-input {
+.form-input, .form-select, .form-multiselect {
     width: 100%;
-    padding: 0.5rem;
-    border-radius: 0.375rem;
-    border: 1px solid #d1d5db;
-}
-
-.form-select {
-    width: 100%;
-    padding: 0.5rem;
-    border-radius: 0.375rem;
+    padding: 0.625rem;
+    border-radius: 0.5rem;
     border: 1px solid #d1d5db;
     background-color: white;
+    transition: border-color 0.15s ease-in-out;
 }
 
-.form-multiselect {
-    width: 100%;
-    padding: 0.5rem;
-    border-radius: 0.375rem;
-    border: 1px solid #d1d5db;
-    background-color: white;
+.form-input:focus, .form-select:focus, .form-multiselect:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.form-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 0.25rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .modal-content {
+        width: 98%;
+        margin: 1% auto;
+        max-height: 98vh;
+    }
+    
+    .modal-body {
+        max-height: 70vh;
+    }
+    
+    .grid {
+        grid-template-columns: 1fr !important;
+    }
 }
 </style>
 {% endblock %} 
