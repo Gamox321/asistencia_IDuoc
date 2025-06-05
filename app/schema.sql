@@ -124,21 +124,19 @@ CREATE TABLE IF NOT EXISTS matricula (
 CREATE TABLE IF NOT EXISTS clase (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL,
-    seccion_id INT NOT NULL,
     fecha DATE NOT NULL,
     hora_inicio TIME NOT NULL,
     hora_fin TIME NOT NULL,
     sala VARCHAR(20),
     modalidad ENUM('presencial', 'virtual', 'hibrida') DEFAULT 'presencial',
+    seccion_id INT NOT NULL,
+    profesor_id INT NOT NULL,
     periodo_academico_id INT NOT NULL,
+    estado VARCHAR(20) DEFAULT 'activa',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (seccion_id) REFERENCES seccion(id) ON DELETE RESTRICT ON UPDATE CASCADE,
-    FOREIGN KEY (periodo_academico_id) REFERENCES periodo_academico(id) ON DELETE RESTRICT ON UPDATE CASCADE,
-    INDEX idx_fecha (fecha),
-    INDEX idx_seccion (seccion_id),
-    INDEX idx_periodo (periodo_academico_id),
-    INDEX idx_modalidad (modalidad)
+    FOREIGN KEY (seccion_id) REFERENCES seccion(id) ON DELETE CASCADE,
+    FOREIGN KEY (profesor_id) REFERENCES profesor(id) ON DELETE CASCADE,
+    FOREIGN KEY (periodo_academico_id) REFERENCES periodo_academico(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Tabla de asistencias
@@ -392,6 +390,18 @@ CREATE TABLE IF NOT EXISTS alertas_sistema (
     INDEX idx_tipo (tipo)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Tabla para registrar la asistencia de alumnos
+CREATE TABLE IF NOT EXISTS alumno_asistencia (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    asistencia_id INT NOT NULL,
+    alumno_id INT NOT NULL,
+    estado VARCHAR(20) NOT NULL DEFAULT 'presente',
+    hora_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (asistencia_id) REFERENCES asistencia(id) ON DELETE CASCADE,
+    FOREIGN KEY (alumno_id) REFERENCES alumno(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_asistencia_alumno (asistencia_id, alumno_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Índices adicionales para optimización de consultas frecuentes
 CREATE INDEX idx_asistencia_fecha_presente ON asistencia(fecha_asistencia, presente);
 CREATE INDEX idx_clase_fecha_hora ON clase(fecha, hora_inicio);
@@ -401,5 +411,26 @@ CREATE INDEX idx_alumno_nombre_completo ON alumno(apellido_paterno, apellido_mat
 CREATE INDEX idx_logs_usuario_accion_fecha ON logs_auditoria(usuario_id, accion, timestamp);
 CREATE INDEX idx_notificaciones_usuario_fecha ON notificaciones(usuario_id, created_at);
 CREATE INDEX idx_login_attempts_recientes ON login_attempts(usuario, timestamp);
+
+-- Eliminar columna es_admin si existe (ya no la necesitamos)
+ALTER TABLE autenticacion
+DROP COLUMN IF EXISTS es_admin;
+
+-- Asegurarnos de que tipo_usuario tenga los valores correctos
+UPDATE autenticacion 
+SET tipo_usuario = 'admin' 
+WHERE usuario = 'admin';
+
+-- Crear tabla alumno_asistencia si no existe
+CREATE TABLE IF NOT EXISTS alumno_asistencia (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    asistencia_id INT NOT NULL,
+    alumno_id INT NOT NULL,
+    estado VARCHAR(20) NOT NULL DEFAULT 'presente',
+    hora_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (asistencia_id) REFERENCES asistencia(id) ON DELETE CASCADE,
+    FOREIGN KEY (alumno_id) REFERENCES alumno(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_asistencia_alumno (asistencia_id, alumno_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 COMMIT; 

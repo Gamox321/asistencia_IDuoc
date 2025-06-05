@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+from datetime import timedelta
 
 # Cargar variables de entorno desde .env
 load_dotenv()
@@ -38,6 +39,16 @@ class Config:
     
     # Asegurarse de que el directorio de uploads existe
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+    # Configuración de Flask-Session
+    SESSION_TYPE = 'filesystem'  # Usar sistema de archivos para almacenar sesiones
+    SESSION_FILE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'flask_session')
+    SESSION_FILE_THRESHOLD = 500  # Número máximo de archivos de sesión
+    SESSION_PERMANENT = True
+    PERMANENT_SESSION_LIFETIME = timedelta(days=7)  # Duración de la sesión
+    
+    # Asegurarse de que el directorio de sesiones existe
+    os.makedirs(SESSION_FILE_DIR, exist_ok=True)
 
     @classmethod
     def init_app(cls):

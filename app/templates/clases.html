@@ -1,289 +1,168 @@
-{% extends "base.html" %}
+{% extends "base_new.html" %}
+
+{% block title %}Mis Clases{% endblock %}
+
+{% block custom_styles %}
+.clase-card {
+    @apply bg-white rounded-xl p-6 shadow-lg mb-5 transform transition-all duration-300 hover:shadow-xl hover:-translate-y-1;
+}
+{% endblock %}
+
+{% block breadcrumb %}
+<nav class="text-gray-500 text-sm mb-4" aria-label="breadcrumb">
+    <ol class="list-none p-0 inline-flex">
+        <li class="flex items-center">
+            <a href="{{ url_for('main.home') }}" class="hover:text-blue-600">Inicio</a>
+            <svg class="fill-current w-3 h-3 mx-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512">
+                <path d="M285.476 272.971L91.132 467.314c-9.373 9.373-24.569 9.373-33.941 0l-22.667-22.667c-9.357-9.357-9.375-24.522-.04-33.901L188.505 256 34.484 101.255c-9.335-9.379-9.317-24.544.04-33.901l22.667-22.667c9.373-9.373 24.569-9.373 33.941 0L285.475 239.03c9.373 9.372 9.373 24.568.001 33.941z"/>
+            </svg>
+        </li>
+        <li class="text-gray-700">Mis Clases</li>
+    </ol>
+</nav>
+{% endblock %}
 
 {% block content %}
-<style>
-    .container-clases {
-        max-width: 1200px;
-        margin: 30px auto;
-        background-color: #ffffff;
-        padding: 25px;
-        border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    }
-
-    .titulo-principal {
-        text-align: center;
-        color: #2c3e50;
-        font-size: 2.5rem;
-        margin-bottom: 30px;
-        font-weight: 600;
-    }
-
-    .filtro-container {
-        background-color: #f8f9fa;
-        padding: 20px;
-        border-radius: 8px;
-        margin-bottom: 25px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 15px;
-    }
-
-    .filtro-container label {
-        color: #2c3e50;
-        font-size: 1.1rem;
-    }
-
-    .input-buscador {
-        padding: 10px 15px;
-        border: 2px solid #e0e0e0;
-        border-radius: 6px;
-        font-size: 1rem;
-        color: #2c3e50;
-        background-color: white;
-        min-width: 200px;
-        transition: all 0.3s ease;
-    }
-
-    .input-buscador:focus {
-        border-color: #3498db;
-        outline: none;
-        box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
-    }
-
-    .tabla {
-        width: 100%;
-        border-collapse: separate;
-        border-spacing: 0;
-        margin-top: 20px;
-        background: white;
-        border-radius: 8px;
-        overflow: hidden;
-    }
-
-    .tabla thead {
-        background-color: #f8f9fa;
-    }
-
-    .tabla th {
-        padding: 15px;
-        text-align: left;
-        color: #2c3e50;
-        font-weight: 600;
-        border-bottom: 2px solid #e0e0e0;
-    }
-
-    .tabla td {
-        padding: 15px;
-        border-bottom: 1px solid #e0e0e0;
-        color: #34495e;
-    }
-
-    .tabla tr:last-child td {
-        border-bottom: none;
-    }
-
-    .tabla tr:hover {
-        background-color: #f8f9fa;
-    }
-
-    .acciones {
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-    }
-
-    .btn {
-        padding: 8px 16px;
-        border-radius: 6px;
-        text-decoration: none;
-        font-weight: 500;
-        transition: all 0.3s ease;
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-    }
-
-    .btn-asistencia {
-        background-color: #2ecc71;
-        color: white;
-    }
-
-    .btn-asistencia:hover {
-        background-color: #27ae60;
-    }
-
-    .btn-ingresar {
-        background-color: #3498db;
-        color: white;
-    }
-
-    .btn-ingresar:hover {
-        background-color: #2980b9;
-    }
-
-    .btn-ver {
-        background-color: #9b59b6;
-        color: white;
-    }
-
-    .btn-ver:hover {
-        background-color: #8e44ad;
-    }
-
-    .mensaje-vacio {
-        text-align: center;
-        padding: 40px;
-        color: #7f8c8d;
-        font-size: 1.2rem;
-        background-color: #f8f9fa;
-        border-radius: 8px;
-        margin-top: 20px;
-    }
-
-    .fecha {
-        color: #7f8c8d;
-        font-size: 0.9rem;
-    }
-
-    .nombre-clase {
-        font-weight: 500;
-        color: #2c3e50;
-    }
-
-    .text-muted {
-        color: #7f8c8d;
-        font-size: 0.85rem;
-    }
-
-    .badge {
-        display: inline-block;
-        padding: 4px 8px;
-        font-size: 0.8rem;
-        font-weight: 500;
-        border-radius: 4px;
-    }
-
-    .badge-info {
-        background-color: #3498db;
-        color: white;
-    }
-
-    @media (max-width: 768px) {
-        .acciones {
-            flex-direction: column;
-        }
-
-        .btn {
-            width: 100%;
-            justify-content: center;
-        }
-
-        .tabla td {
-            padding: 10px;
-        }
-    }
-</style>
-
-<div class="container-clases">
-    <h1 class="titulo-principal">📚 Mis Clases</h1>
-
-    <div class="filtro-container">
-        <label for="filtro-clase">🔍 Filtrar por clase:</label>
-        <select id="filtro-clase" class="input-buscador">
-            <option value="todas">Todas las clases</option>
-            {% for clase in clases %}
-                <option value="{{ clase.nombre | lower | replace(' ', '-') }}">{{ clase.nombre }}</option>
-            {% endfor %}
-        </select>
+<div class="max-w-7xl mx-auto">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold flex items-center">
+            <i class="fas fa-chalkboard-teacher mr-3"></i> Mis Clases
+        </h1>
+        {% if role_context.is_coordinator or role_context.is_admin %}
+            <span class="bg-blue-600 text-white px-3 py-1 rounded-full text-sm">
+                {{ "Administrador" if role_context.is_admin else "Coordinador" }}
+            </span>
+        {% endif %}
     </div>
 
-    {% if clases %}
-    <table class="tabla">
-        <thead>
-            <tr>
-                <th>📘 Nombre</th>
-                <th>📅 Fecha</th>
-                <th>🏫 Sala</th>
-                <th>⏰ Horario</th>
-                <th>👥 Alumnos</th>
-                <th>⚙️ Acciones</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for clase in clases %}
-            <tr class="fila-clase" data-nombre="{{ clase.nombre | lower | replace(' ', '-') }}">
-                <td>
-                    <span class="nombre-clase">{{ clase.nombre }}</span><br>
-                    <small class="text-muted">Sección: {{ clase.seccion_codigo }}</small>
-                </td>
-                <td>
-                    <span class="fecha">{{ clase.fecha }}</span>
-                </td>
-                <td>
-                    <span>{{ clase.sala or 'N/A' }}</span>
-                </td>
-                <td>
-                    <span>{{ clase.hora_inicio }} - {{ clase.hora_fin }}</span>
-                </td>
-                <td>
-                    <span class="badge badge-info">{{ clase.total_alumnos }} alumnos</span>
-                </td>
-                <td>
-                    <div class="acciones">
-                        <a href="{{ url_for('main.asistencia', clase_id=clase.id) }}" class="btn btn-asistencia">
-                            ✅ Asistencia
-                        </a>
-                        <a href="{{ url_for('main.ingresar_alumno', clase_id=clase.id) }}" class="btn btn-ingresar">
-                            📝 Ingresar Alumno
-                        </a>
-                        <a href="{{ url_for('main.historial_asistencia', clase_id=clase.id) }}" class="btn btn-ver">
-                            📊 Ver Historial
-                        </a>
-                    </div>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-    <div class="mensaje-vacio">
-        <p>📝 No hay clases asignadas aún.</p>
+    <!-- Barra de búsqueda y filtros -->
+    <div class="bg-white rounded-xl shadow-md p-4 mb-6">
+        <div class="flex flex-col md:flex-row gap-4">
+            <div class="flex-1">
+                <label for="buscar" class="block text-sm font-medium text-gray-700 mb-1">Buscar</label>
+                <div class="relative">
+                    <input type="text" id="buscar" 
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                           placeholder="Buscar por nombre, sección...">
+                    <i class="fas fa-search absolute right-3 top-3 text-gray-400"></i>
+                </div>
+            </div>
+            <div class="md:w-48">
+                <label for="filtro" class="block text-sm font-medium text-gray-700 mb-1">Filtrar por</label>
+                <select id="filtro" 
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="todas">Todas las clases</option>
+                    <option value="hoy">Clases de hoy</option>
+                    <option value="semana">Esta semana</option>
+                    <option value="mes">Este mes</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lista de Clases -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for clase in clases %}
+        <div class="clase-card">
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <h3 class="text-xl font-semibold text-gray-800">{{ clase.nombre }}</h3>
+                    <p class="text-gray-600">Sección {{ clase.seccion_codigo }}</p>
+                </div>
+                <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
+                    {{ clase.fecha|date_format }}
+                </span>
+            </div>
+            
+            <div class="space-y-2 mb-4">
+                <div class="flex items-center text-gray-600">
+                    <i class="fas fa-users mr-2"></i>
+                    <span>{{ clase.total_alumnos }} estudiantes</span>
+                </div>
+                <div class="flex items-center text-gray-600">
+                    <i class="fas fa-clock mr-2"></i>
+                    <span>{{ clase.hora_inicio|time_format }} - {{ clase.hora_fin|time_format }}</span>
+                </div>
+                <div class="flex items-center text-gray-600">
+                    <i class="fas fa-door-open mr-2"></i>
+                    <span>Sala {{ clase.sala }}</span>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap gap-2">
+                <a href="{{ url_for('main.asistencia', clase_id=clase.id) }}" 
+                   class="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
+                    <i class="fas fa-check-circle mr-2"></i>
+                    Pasar Asistencia
+                </a>
+                <a href="{{ url_for('main.historial_asistencia', clase_id=clase.id) }}"
+                   class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+                    <i class="fas fa-history mr-2"></i>
+                    Historial
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if not clases %}
+    <div class="text-center py-12">
+        <div class="bg-gray-50 rounded-xl p-8 max-w-lg mx-auto">
+            <i class="fas fa-book-open text-4xl text-gray-400 mb-4"></i>
+            <h3 class="text-xl font-semibold text-gray-800 mb-2">No hay clases asignadas</h3>
+            <p class="text-gray-600">
+                No se encontraron clases asignadas para este período.
+                Si crees que esto es un error, contacta al coordinador.
+            </p>
+        </div>
     </div>
     {% endif %}
 </div>
+{% endblock %}
 
+{% block scripts %}
 <script>
-    document.getElementById('filtro-clase').addEventListener('change', function() {
-        const seleccion = this.value;
-        const filas = document.querySelectorAll('.fila-clase');
-        
-        filas.forEach(fila => {
-            const mostrar = seleccion === 'todas' || fila.dataset.nombre === seleccion;
-            fila.style.display = mostrar ? '' : 'none';
-            
-            // Añadir una transición suave
-            if (mostrar) {
-                fila.style.opacity = '0';
-                setTimeout(() => {
-                    fila.style.opacity = '1';
-                }, 50);
-            }
-        });
-    });
+document.addEventListener('DOMContentLoaded', function() {
+    const buscarInput = document.getElementById('buscar');
+    const filtroSelect = document.getElementById('filtro');
+    const clases = document.querySelectorAll('.clase-card');
 
-    // Añadir transición inicial
-    document.addEventListener('DOMContentLoaded', function() {
-        const filas = document.querySelectorAll('.fila-clase');
-        filas.forEach((fila, index) => {
-            fila.style.opacity = '0';
-            setTimeout(() => {
-                fila.style.opacity = '1';
-                fila.style.transition = 'opacity 0.3s ease';
-            }, index * 100);
+    function filtrarClases() {
+        const busqueda = buscarInput.value.toLowerCase();
+        const filtro = filtroSelect.value;
+
+        clases.forEach(clase => {
+            const texto = clase.textContent.toLowerCase();
+            const fecha = clase.querySelector('.bg-blue-100').textContent.trim();
+            let mostrar = texto.includes(busqueda);
+
+            if (mostrar && filtro !== 'todas') {
+                const fechaClase = new Date(fecha);
+                const hoy = new Date();
+                
+                switch(filtro) {
+                    case 'hoy':
+                        mostrar = fechaClase.toDateString() === hoy.toDateString();
+                        break;
+                    case 'semana':
+                        const inicioSemana = new Date(hoy);
+                        inicioSemana.setDate(hoy.getDate() - hoy.getDay());
+                        mostrar = fechaClase >= inicioSemana;
+                        break;
+                    case 'mes':
+                        mostrar = fechaClase.getMonth() === hoy.getMonth() &&
+                                 fechaClase.getFullYear() === hoy.getFullYear();
+                        break;
+                }
+            }
+
+            clase.style.display = mostrar ? '' : 'none';
         });
-    });
+    }
+
+    buscarInput.addEventListener('input', filtrarClases);
+    filtroSelect.addEventListener('change', filtrarClases);
+});
 </script>
 {% endblock %}
 

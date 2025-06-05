@@ -1,308 +1,230 @@
-{% extends "base.html" %}
+{% extends "base_new.html" %}
+
 {% block title %}Historial de Asistencia{% endblock %}
 
-{% block content %}
-<style>
-    .historial-container {
-        max-width: 1200px;
-        margin: 30px auto;
-        background-color: #ffffff;
-        padding: 25px;
-        border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    }
-
-    .historial-container h2 {
-        text-align: center;
-        margin-bottom: 30px;
-        color: #2c3e50;
-        font-size: 2rem;
-    }
-
-    .tabla-historial {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 20px;
-    }
-
-    .tabla-historial th, .tabla-historial td {
-        padding: 15px;
-        text-align: left;
-        border-bottom: 1px solid #e0e0e0;
-    }
-
-    .tabla-historial th {
-        background-color: #f8f9fa;
-        color: #2c3e50;
-        font-weight: 600;
-        position: sticky;
-        top: 0;
-        z-index: 10;
-    }
-
-    .tabla-historial tbody tr {
-        cursor: pointer;
-        transition: background-color 0.3s ease;
-    }
-
-    .tabla-historial tbody tr:hover {
-        background-color: #f8f9fa;
-    }
-
+{% block custom_styles %}
+.historial-card {
+    @apply bg-white rounded-xl p-6 shadow-lg mb-6;
+}
     .porcentaje-alto {
-        color: #27ae60;
-        font-weight: bold;
+    @apply text-green-600 font-semibold;
     }
-
     .porcentaje-medio {
-        color: #f39c12;
-        font-weight: bold;
+    @apply text-yellow-600 font-semibold;
     }
-
     .porcentaje-bajo {
-        color: #e74c3c;
-        font-weight: bold;
-    }
+    @apply text-red-600 font-semibold;
+}
+{% endblock %}
 
-    .detalle-alumnos {
-        max-height: 0;
-        overflow: hidden;
-        transition: max-height 0.3s ease-out;
-        background-color: #f8f9fa;
-        opacity: 0;
-        visibility: hidden;
-    }
+{% block breadcrumb %}
+<nav class="text-gray-500 text-sm mb-4" aria-label="breadcrumb">
+    <ol class="list-none p-0 inline-flex">
+        <li class="flex items-center">
+            <a href="{{ url_for('main.home') }}" class="hover:text-blue-600">Inicio</a>
+            <svg class="fill-current w-3 h-3 mx-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512">
+                <path d="M285.476 272.971L91.132 467.314c-9.373 9.373-24.569 9.373-33.941 0l-22.667-22.667c-9.357-9.357-9.375-24.522-.04-33.901L188.505 256 34.484 101.255c-9.335-9.379-9.317-24.544.04-33.901l22.667-22.667c9.373-9.373 24.569-9.373 33.941 0L285.475 239.03c9.373 9.372 9.373 24.568.001 33.941z"/>
+            </svg>
+        </li>
+        <li class="flex items-center">
+            <a href="{{ url_for('main.ver_clases') }}" class="hover:text-blue-600">Mis Clases</a>
+            <svg class="fill-current w-3 h-3 mx-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512">
+                <path d="M285.476 272.971L91.132 467.314c-9.373 9.373-24.569 9.373-33.941 0l-22.667-22.667c-9.357-9.357-9.375-24.522-.04-33.901L188.505 256 34.484 101.255c-9.335-9.379-9.317-24.544.04-33.901l22.667-22.667c9.373-9.373 24.569-9.373 33.941 0L285.475 239.03c9.373 9.372 9.373 24.568.001 33.941z"/>
+            </svg>
+        </li>
+        <li class="text-gray-700">Historial de Asistencia</li>
+    </ol>
+</nav>
+{% endblock %}
 
-    .detalle-alumnos.abierto {
-        max-height: 500px; /* Aumentado para mostrar más contenido */
-        overflow-y: auto;
-        margin: 10px 0;
-        border: 1px solid #e0e0e0;
-        border-radius: 8px;
-        opacity: 1;
-        visibility: visible;
-        transition: max-height 0.5s ease-out, opacity 0.3s ease-out;
-    }
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <!-- Información de la Clase -->
+    <div class="historial-card">
+        <div class="flex justify-between items-start mb-6">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">{{ clase.nombre }}</h1>
+                <p class="text-gray-600">Sección {{ clase.seccion }}</p>
+            </div>
+            <div class="text-right">
+                <span class="bg-blue-100 text-blue-800 text-sm font-medium px-3 py-1 rounded-full">
+                    {{ clase.horario }}
+                </span>
+            </div>
+        </div>
 
-    .tabla-alumnos {
-        width: 100%;
-        border-collapse: collapse;
-        margin: 0;
-        background-color: white;
-    }
+        <!-- Estadísticas Generales -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-4 text-white">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <p class="text-white/80 text-sm">Total Clases</p>
+                        <h3 class="text-2xl font-bold">{{ stats.total_clases }}</h3>
+                    </div>
+                    <i class="fas fa-calendar-alt text-2xl opacity-75"></i>
+                </div>
+            </div>
+            <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-4 text-white">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <p class="text-white/80 text-sm">Asistencia Promedio</p>
+                        <h3 class="text-2xl font-bold">{{ stats.promedio_asistencia }}%</h3>
+                    </div>
+                    <i class="fas fa-chart-line text-2xl opacity-75"></i>
+                </div>
+            </div>
+            <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-4 text-white">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <p class="text-white/80 text-sm">Total Estudiantes</p>
+                        <h3 class="text-2xl font-bold">{{ stats.total_estudiantes }}</h3>
+                    </div>
+                    <i class="fas fa-users text-2xl opacity-75"></i>
+                </div>
+            </div>
+        </div>
 
-    .tabla-alumnos th {
-        background-color: #f1f1f1;
-        color: #2c3e50;
-        font-weight: 600;
-        padding: 12px 15px;
-        position: sticky;
-        top: 0;
-        z-index: 1;
-    }
+        <!-- Filtros -->
+        <div class="flex flex-col md:flex-row gap-4 mb-6">
+            <div class="flex-grow">
+                <label for="buscar" class="block text-sm font-medium text-gray-700 mb-1">Buscar Estudiante</label>
+                <div class="relative">
+                    <input type="text" id="buscar" 
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                           placeholder="Nombre o RUT...">
+                    <div class="absolute inset-y-0 right-0 flex items-center pr-3">
+                        <i class="fas fa-search text-gray-400"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="md:w-48">
+                <label for="filtro" class="block text-sm font-medium text-gray-700 mb-1">Filtrar por</label>
+                <select id="filtro" 
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="todos">Todos</option>
+                    <option value="presente">Presentes</option>
+                    <option value="ausente">Ausentes</option>
+                </select>
+            </div>
+        </div>
 
-    .tabla-alumnos td {
-        padding: 10px 15px;
-        border-bottom: 1px solid #e0e0e0;
-    }
-
-    .tabla-alumnos tr:last-child td {
-        border-bottom: none;
-    }
-
-    .alumno-presente {
-        color: #27ae60;
-        font-weight: 500;
-    }
-
-    .alumno-ausente {
-        color: #e74c3c;
-        font-weight: 500;
-    }
-
-    .toggle-detalle {
-        cursor: pointer;
-        user-select: none;
-    }
-
-    .toggle-detalle:hover {
-        background-color: #f1f1f1;
-    }
-
-    .icono-toggle {
-        display: inline-block;
-        margin-right: 5px;
-        transition: transform 0.3s ease;
-        font-size: 0.8em;
-    }
-
-    .toggle-detalle.abierto .icono-toggle {
-        transform: rotate(90deg);
-    }
-
-    .toggle-detalle.abierto {
-        background-color: #f1f1f1;
-    }
-
-    .sin-registros {
-        text-align: center;
-        padding: 20px;
-        color: #666;
-        font-style: italic;
-    }
-
-    /* Estilos para el modal */
-    .modal {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background-color: rgba(0, 0, 0, 0.5);
-        z-index: 1000;
-    }
-
-    .modal-content {
-        background-color: white;
-        margin: 5% auto;
-        padding: 20px;
-        width: 80%;
-        max-width: 1000px;
-        border-radius: 12px;
-        position: relative;
-    }
-
-    .close-button {
-        position: absolute;
-        right: 20px;
-        top: 15px;
-        font-size: 24px;
-        cursor: pointer;
-        color: #666;
-    }
-
-    .close-button:hover {
-        color: #333;
-    }
-</style>
-
-<div class="historial-container">
-    <h2>📊 Historial de Asistencia - {{ nombre_clase }}</h2>
-
-    {% if registros %}
-    <table class="tabla-historial">
-        <thead>
-            <tr>
-                <th>Fecha</th>
-                <th>Asistentes</th>
-                <th>Total Alumnos</th>
-                <th>Porcentaje</th>
+        <!-- Tabla de Asistencia -->
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Estudiante
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Asistencia
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Última Asistencia
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Acciones
+                        </th>
             </tr>
         </thead>
-        <tbody>
-            {% for registro in registros %}
-            <tr class="toggle-detalle" data-index="{{ loop.index }}">
-                <td>
-                    <span class="icono-toggle">▶</span>
-                    {{ registro.fecha }}
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for estudiante in estudiantes %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0 h-10 w-10">
+                                    <img class="h-10 w-10 rounded-full" 
+                                         src="{{ url_for('static', filename='img/default-avatar.png') }}" 
+                                         alt="{{ estudiante.nombre }}">
+                                </div>
+                                <div class="ml-4">
+                                    <div class="text-sm font-medium text-gray-900">
+                                        {{ estudiante.nombre }}
+                                    </div>
+                                    <div class="text-sm text-gray-500">
+                                        {{ estudiante.rut }}
+                                    </div>
+                                </div>
+                            </div>
                 </td>
-                <td>{{ registro.asistentes }}/{{ registro.total_alumnos }}</td>
-                <td>{{ registro.total_alumnos }}</td>
-                <td class="
-                    {% if registro.porcentaje >= 75 %}porcentaje-alto
-                    {% elif registro.porcentaje >= 50 %}porcentaje-medio
-                    {% else %}porcentaje-bajo{% endif %}
-                ">
-                    {{ registro.porcentaje }}%
-                </td>
-            </tr>
-            <tr>
-                <td colspan="4" style="padding: 0;">
-                    <div class="detalle-alumnos" id="detalle-{{ loop.index }}">
-                        <table class="tabla-alumnos">
-                            <thead>
-                                <tr>
-                                    <th>Nombre</th>
-                                    <th>RUT</th>
-                                    <th>Estado</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% if registro.alumnos %}
-                                    {% for alumno in registro.alumnos %}
-                                    <tr>
-                                        <td>{{ alumno.nombre }}</td>
-                                        <td>{{ alumno.rut }}</td>
-                                        <td class="{% if alumno.presente %}alumno-presente{% else %}alumno-ausente{% endif %}">
-                                            {{ '✓ Presente' if alumno.presente else '✗ Ausente' }}
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% if estudiante.porcentaje_asistencia is not none %}
+                                {% if estudiante.porcentaje_asistencia >= 85 %}
+                                    <span class="porcentaje-alto">{{ estudiante.porcentaje_asistencia }}%</span>
+                                {% elif estudiante.porcentaje_asistencia >= 70 %}
+                                    <span class="porcentaje-medio">{{ estudiante.porcentaje_asistencia }}%</span>
                                 {% else %}
-                                    <tr>
-                                        <td colspan="3" class="sin-registros">No hay registros de alumnos para esta fecha</td>
-                                    </tr>
+                                    <span class="porcentaje-bajo">{{ estudiante.porcentaje_asistencia }}%</span>
                                 {% endif %}
-                            </tbody>
-                        </table>
+                            {% else %}
+                                <span class="text-gray-500">Sin registros</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900">
+                                {{ estudiante.ultima_asistencia or 'Sin registro' }}
                     </div>
                 </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                            <button onclick="verDetalles('{{ estudiante.id }}')"
+                                    class="text-blue-600 hover:text-blue-900">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                Ver Detalles
+                            </button>
+                        </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
-    {% else %}
-    <div class="sin-registros">
-        No hay registros de asistencia para esta clase
+        </div>
+
+        {% if not estudiantes %}
+        <div class="text-center py-12">
+            <div class="bg-gray-50 rounded-xl p-8 max-w-lg mx-auto">
+                <i class="fas fa-user-graduate text-4xl text-gray-400 mb-4"></i>
+                <h3 class="text-xl font-semibold text-gray-800 mb-2">No hay estudiantes registrados</h3>
+                <p class="text-gray-600">
+                    No se encontraron estudiantes en esta clase.
+                    Si crees que esto es un error, contacta al coordinador.
+                </p>
+            </div>
     </div>
     {% endif %}
-</div>
-
-<!-- Modal para detalles -->
-<div id="detalleModal" class="modal">
-    <div class="modal-content">
-        <span class="close-button" onclick="cerrarModal()">&times;</span>
-        <h3 id="modalTitle" style="text-align: center; margin-bottom: 20px; font-size: 1.5rem;"></h3>
-        <div id="modalContent"></div>
     </div>
 </div>
+{% endblock %}
 
+{% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('.toggle-detalle').forEach(row => {
-        row.addEventListener('click', function() {
-            const index = this.dataset.index;
-            const detalle = document.getElementById(`detalle-${index}`);
-            const estaAbierto = detalle.classList.contains('abierto');
+    const buscarInput = document.getElementById('buscar');
+    const filtroSelect = document.getElementById('filtro');
+    const filas = document.querySelectorAll('tbody tr');
+
+    function filtrarEstudiantes() {
+        const busqueda = buscarInput.value.toLowerCase();
+        const filtro = filtroSelect.value;
+
+        filas.forEach(fila => {
+            const texto = fila.textContent.toLowerCase();
+            const porcentaje = parseInt(fila.querySelector('[class^="porcentaje-"]').textContent);
             
-            // Cerrar todos los detalles
-            document.querySelectorAll('.detalle-alumnos').forEach(d => {
-                d.classList.remove('abierto');
-                d.style.maxHeight = null;
-            });
-            document.querySelectorAll('.toggle-detalle').forEach(t => t.classList.remove('abierto'));
+            let mostrar = texto.includes(busqueda);
             
-            // Abrir/cerrar el detalle seleccionado
-            if (!estaAbierto) {
-                detalle.classList.add('abierto');
-                this.classList.add('abierto');
-                detalle.style.maxHeight = detalle.scrollHeight + "px";
-            }
+            if (filtro === 'presente' && porcentaje < 75) mostrar = false;
+            if (filtro === 'ausente' && porcentaje >= 75) mostrar = false;
+            
+            fila.style.display = mostrar ? '' : 'none';
         });
-    });
+    }
+
+    buscarInput.addEventListener('input', filtrarEstudiantes);
+    filtroSelect.addEventListener('change', filtrarEstudiantes);
 });
 
-function cerrarModal() {
-    document.getElementById('detalleModal').style.display = 'none';
-}
-
-// Cerrar modal al hacer clic fuera de él
-window.onclick = function(event) {
-    const modal = document.getElementById('detalleModal');
-    if (event.target == modal) {
-        modal.style.display = 'none';
-    }
+function verDetalles(estudianteId) {
+    // Implementar lógica para mostrar detalles del estudiante
+    alert('Función en desarrollo');
 }
 </script>
 {% endblock %} 

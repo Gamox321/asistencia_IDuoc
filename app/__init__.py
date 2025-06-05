@@ -4,6 +4,16 @@ from .database import init_app as init_db
 from .auth import SecurityManager
 import os
 from datetime import timedelta
+from flask_login import LoginManager
+from .models import User
+from flask_session import Session
+from app.filters import format_time, format_date, format_datetime, datetime_filter
+
+login_manager = LoginManager()
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.get(user_id)
 
 def create_app(test_config=None):
     # Crear la instancia de la aplicación
@@ -94,5 +104,28 @@ def create_app(test_config=None):
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
     app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 hora
+
+    login_manager.init_app(app)
+    login_manager.login_view = 'auth.login'
+    login_manager.login_message = 'Por favor inicia sesión para acceder a esta página.'
+    login_manager.login_message_category = 'info'
+
+    from app import db
+    db.init_app(app)
+
+    from app.auth import bp as auth_bp
+    app.register_blueprint(auth_bp)
+
+    from app.api import bp as api_bp
+    app.register_blueprint(api_bp)
+
+    # Configurar sesión
+    Session(app)
+    
+    # Registrar filtros Jinja2
+    app.jinja_env.filters['time_format'] = format_time
+    app.jinja_env.filters['date_format'] = format_date
+    app.jinja_env.filters['datetime_format'] = format_datetime
+    app.jinja_env.filters['datetime'] = datetime_filter
 
     return app 

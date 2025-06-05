@@ -7,6 +7,8 @@ from functools import wraps
 from flask import session, flash, redirect, url_for, abort
 from .database import db
 from .auth import require_login, get_current_user_id
+from flask import Blueprint, request, render_template
+from mysql.connector import Error
 
 class RoleManager:
     """Gestor de roles y permisos del sistema"""
@@ -142,21 +144,50 @@ def require_level(min_level):
 
 def admin_required(f):
     """Decorador para rutas que requieren admin"""
-    return require_role('admin')(f)
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        print(f"DEBUG Admin Required - Checking session: {dict(session)}")
+        if 'usuario' not in session:
+            print("DEBUG Admin Required - No user in session")
+            flash('Por favor inicie sesión', 'warning')
+            return redirect(url_for('auth.login'))
+            
+        if not session.get('es_admin'):
+            print(f"DEBUG Admin Required - User is not admin. es_admin={session.get('es_admin')}")
+            flash('No tienes permisos de administrador', 'error')
+            return redirect(url_for('main.dashboard'))
+            
+        print("DEBUG Admin Required - Access granted")
+        return f(*args, **kwargs)
+    return decorated_function
 
 def coordinator_required(f):
     """Decorador para rutas que requieren coordinador o admin"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if not require_login():
-            flash('Debes iniciar sesión', 'error')
-            return redirect(url_for('main.login'))
-        
-        usuario_id = get_current_user_id()
-        if not (RoleManager.is_admin(usuario_id) or RoleManager.is_coordinator(usuario_id)):
-            flash('No tienes permisos para acceder a esta sección', 'error')
-            return redirect(url_for('main.home'))
-        
+        if 'usuario' not in session:
+            flash('Por favor inicie sesión', 'warning')
+            return redirect(url_for('auth.login'))
+            
+        try:
+            with db.get_connection() as conexion:
+                cursor = conexion.cursor(dictionary=True)
+                cursor.execute("""
+                    SELECT es_coordinador 
+                    FROM autenticacion 
+                    WHERE id = %s
+                """, (session.get('profesor_id'),))
+                
+                result = cursor.fetchone()
+                if not result or not result['es_coordinador']:
+                    flash('No tienes permisos de coordinador', 'error')
+                    return redirect(url_for('main.dashboard'))
+                    
+        except Exception as e:
+            print(f"Error verificando rol coordinador: {e}")
+            flash('Error verificando permisos', 'error')
+            return redirect(url_for('main.dashboard'))
+            
         return f(*args, **kwargs)
     return decorated_function
 
@@ -164,28 +195,51 @@ def professor_required(f):
     """Decorador para rutas que requieren profesor, coordinador o admin"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if not require_login():
-            flash('Debes iniciar sesión', 'error')
-            return redirect(url_for('main.login'))
-        
-        usuario_id = get_current_user_id()
-        if not (RoleManager.is_admin(usuario_id) or 
-                RoleManager.is_coordinator(usuario_id) or 
-                RoleManager.is_professor(usuario_id)):
-            flash('No tienes permisos para acceder a esta sección', 'error')
-            return redirect(url_for('main.home'))
-        
+        if 'usuario' not in session:
+            flash('Por favor inicie sesión', 'warning')
+            return redirect(url_for('auth.login'))
+            
+        try:
+            profesor_id = session.get('profesor_id')
+            if not profesor_id:
+                flash('No tienes permisos de profesor', 'error')
+                return redirect(url_for('main.dashboard'))
+                    
+        except Exception as e:
+            print(f"Error verificando rol profesor: {e}")
+            flash('Error verificando permisos', 'error')
+            return redirect(url_for('main.dashboard'))
+            
         return f(*args, **kwargs)
     return decorated_function
 
 # Funciones helper para usar en templates
-def get_user_role_context(usuario_id):
-    """Obtener contexto de roles para templates"""
-    return {
-        'is_admin': RoleManager.is_admin(usuario_id),
-        'is_coordinator': RoleManager.is_coordinator(usuario_id),
-        'is_professor': RoleManager.is_professor(usuario_id),
-        'user_level': RoleManager.get_user_highest_role_level(usuario_id),
-        'roles': RoleManager.get_user_roles(usuario_id),
-        'permissions': RoleManager.get_user_permissions(usuario_id)
-    } 
+def get_user_role_context(user_id):
+    """Obtener el contexto de roles del usuario"""
+    try:
+        with db.get_connection() as conexion:
+            cursor = conexion.cursor(dictionary=True)
+            cursor.execute("""
+                SELECT 
+                    a.tipo_usuario,
+                    CASE WHEN a.tipo_usuario = 'admin' THEN TRUE ELSE FALSE END as es_admin,
+                    CASE WHEN a.tipo_usuario = 'coordinador' THEN TRUE ELSE FALSE END as es_coordinador,
+                    CASE WHEN a.tipo_usuario = 'profesor' THEN TRUE ELSE FALSE END as es_profesor
+                FROM autenticacion a
+                WHERE a.profesor_id = %s
+            """, (user_id,))
+            result = cursor.fetchone()
+            
+            if not result:
+                return {'is_admin': False, 'is_coordinator': False, 'is_professor': False}
+            
+            return {
+                'is_admin': result['tipo_usuario'] == 'admin',
+                'is_coordinator': result['tipo_usuario'] == 'coordinador',
+                'is_professor': result['tipo_usuario'] == 'profesor'
+            }
+            
+    except Exception as e:
+        print(f"❌ Error al conectar a MySQL: {str(e)}")
+        print(f"Error obteniendo roles: {str(e)}")
+        return {'is_admin': False, 'is_coordinator': False, 'is_professor': False} 

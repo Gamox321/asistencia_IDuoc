@@ -25,50 +25,32 @@ class ReportManager:
                 profesor_filter = "AND pc.profesor_id = %s" if profesor_id else ""
                 profesor_params = (profesor_id,) if profesor_id else ()
                 
-                # 1. Total de clases
-                cursor.execute(f"""
-                    SELECT COUNT(*) as total
-                    FROM clase c
-                    JOIN profesor_clase pc ON c.id = pc.clase_id
-                    JOIN periodo_academico pa ON c.periodo_academico_id = pa.id
-                    WHERE pa.estado = 'activo' {profesor_filter}
-                """, profesor_params)
-                stats['total_clases'] = cursor.fetchone()['total']
-                
-                # 2. Total de estudiantes únicos
-                cursor.execute(f"""
-                    SELECT COUNT(DISTINCT ac.alumno_id) as total
-                    FROM alumno_clase ac
-                    JOIN clase c ON ac.clase_id = c.id
-                    JOIN profesor_clase pc ON c.id = pc.clase_id
-                    JOIN periodo_academico pa ON c.periodo_academico_id = pa.id
-                    WHERE ac.estado = 'inscrito' AND pa.estado = 'activo' {profesor_filter}
-                """, profesor_params)
-                stats['total_estudiantes'] = cursor.fetchone()['total']
-                
-                # 3. Clases de hoy
-                cursor.execute(f"""
-                    SELECT COUNT(*) as total
-                    FROM clase c
-                    JOIN profesor_clase pc ON c.id = pc.clase_id
-                    WHERE c.fecha = CURDATE() {profesor_filter}
-                """, profesor_params)
-                stats['clases_hoy'] = cursor.fetchone()['total']
-                
-                # 4. Promedio de asistencia general
+                # Consulta optimizada que obtiene todas las estadísticas en una sola query
                 cursor.execute(f"""
                     SELECT 
-                        AVG(CASE WHEN a.presente = 1 THEN 100.0 ELSE 0.0 END) as promedio
-                    FROM asistencia a
-                    JOIN clase c ON a.clase_id = c.id
+                        COUNT(DISTINCT c.id) as total_clases,
+                        COUNT(DISTINCT ac.alumno_id) as total_estudiantes,
+                        SUM(CASE WHEN c.fecha = CURDATE() THEN 1 ELSE 0 END) as clases_hoy,
+                        ROUND(
+                            AVG(CASE WHEN a.presente = 1 THEN 100.0 ELSE 0.0 END), 1
+                        ) as promedio_asistencia
+                    FROM clase c
                     JOIN profesor_clase pc ON c.id = pc.clase_id
                     JOIN periodo_academico pa ON c.periodo_academico_id = pa.id
+                    LEFT JOIN alumno_clase ac ON c.id = ac.clase_id AND ac.estado = 'inscrito'
+                    LEFT JOIN asistencia a ON c.id = a.clase_id
                     WHERE pa.estado = 'activo' {profesor_filter}
                 """, profesor_params)
-                result = cursor.fetchone()
-                stats['promedio_asistencia'] = round(result['promedio'] or 0, 1)
                 
-                # 5. Asistencia últimos 7 días
+                result = cursor.fetchone()
+                stats.update({
+                    'total_clases': result['total_clases'],
+                    'total_estudiantes': result['total_estudiantes'],
+                    'clases_hoy': result['clases_hoy'],
+                    'promedio_asistencia': result['promedio_asistencia'] or 0
+                })
+                
+                # Asistencia últimos 7 días (optimizada)
                 cursor.execute(f"""
                     SELECT 
                         DATE(a.fecha_asistencia) as fecha,
@@ -77,13 +59,17 @@ class ReportManager:
                     FROM asistencia a
                     JOIN clase c ON a.clase_id = c.id
                     JOIN profesor_clase pc ON c.id = pc.clase_id
-                    WHERE a.fecha_asistencia >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) {profesor_filter}
+                    WHERE a.fecha_asistencia >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+                    AND a.fecha_asistencia <= CURDATE()
+                    {profesor_filter}
                     GROUP BY DATE(a.fecha_asistencia)
                     ORDER BY fecha DESC
                 """, profesor_params)
-                asistencia_diaria = cursor.fetchall()
                 
+                asistencia_diaria = cursor.fetchall()
                 stats['asistencia_semanal'] = []
+                
+                # Procesar datos de asistencia
                 for dia in asistencia_diaria:
                     porcentaje = (dia['presentes'] / dia['total_registros'] * 100) if dia['total_registros'] > 0 else 0
                     stats['asistencia_semanal'].append({
@@ -258,40 +244,56 @@ class ReportManager:
             return None
     
     @staticmethod
-    def get_low_attendance_alerts(min_percentage=75):
+    def get_low_attendance_alerts():
         """Obtener alertas de baja asistencia"""
         try:
             with db.get_connection() as conexion:
                 cursor = conexion.cursor(dictionary=True)
                 
+                # Consulta optimizada para alertas
                 cursor.execute("""
+                    WITH asistencia_alumno AS (
+                        SELECT 
+                            ac.alumno_id,
+                            c.id as clase_id,
+                            COUNT(a.id) as total_clases,
+                            SUM(CASE WHEN a.presente = 1 THEN 1 ELSE 0 END) as clases_asistidas,
+                            ROUND(
+                                (SUM(CASE WHEN a.presente = 1 THEN 1 ELSE 0 END) * 100.0 / COUNT(a.id)), 1
+                            ) as porcentaje
+                        FROM alumno_clase ac
+                        JOIN clase c ON ac.clase_id = c.id
+                        LEFT JOIN asistencia a ON c.id = a.clase_id AND ac.alumno_id = a.alumno_id
+                        WHERE ac.estado = 'inscrito'
+                        GROUP BY ac.alumno_id, c.id
+                        HAVING porcentaje < 70
+                    )
                     SELECT 
-                        al.id,
-                        al.rut,
-                        CONCAT(al.nombre, ' ', al.apellido_paterno, ' ', COALESCE(al.apellido_materno, '')) as nombre_completo,
+                        a.nombre,
+                        a.apellido_paterno,
+                        a.apellido_materno,
                         c.nombre as clase_nombre,
                         s.codigo as seccion,
-                        COUNT(DISTINCT CASE WHEN a.clase_id IS NOT NULL THEN c.id END) as total_clases_registradas,
-                        COUNT(DISTINCT CASE WHEN a.presente = 1 THEN c.id END) as clases_asistidas,
-                        ROUND(
-                            (COUNT(DISTINCT CASE WHEN a.presente = 1 THEN c.id END) / 
-                             COUNT(DISTINCT CASE WHEN a.clase_id IS NOT NULL THEN c.id END) * 100), 1
-                        ) as porcentaje_asistencia
-                    FROM alumno al
-                    JOIN alumno_clase ac ON al.id = ac.alumno_id
-                    JOIN clase c ON ac.clase_id = c.id
+                        aa.porcentaje as porcentaje_asistencia
+                    FROM asistencia_alumno aa
+                    JOIN alumno a ON aa.alumno_id = a.id
+                    JOIN clase c ON aa.clase_id = c.id
                     JOIN seccion s ON c.seccion_id = s.id
-                    JOIN periodo_academico pa ON c.periodo_academico_id = pa.id
-                    LEFT JOIN asistencia a ON al.id = a.alumno_id AND c.id = a.clase_id
-                    WHERE ac.estado = 'inscrito' AND pa.estado = 'activo'
-                    GROUP BY al.id, al.rut, al.nombre, al.apellido_paterno, al.apellido_materno, c.id, c.nombre, s.codigo
-                    HAVING COUNT(DISTINCT CASE WHEN a.clase_id IS NOT NULL THEN c.id END) > 0
-                    AND porcentaje_asistencia < %s
-                    ORDER BY porcentaje_asistencia ASC
-                """, (min_percentage,))
+                    ORDER BY aa.porcentaje ASC
+                    LIMIT 10
+                """)
                 
-                return cursor.fetchall()
+                alertas = cursor.fetchall()
+                
+                # Formatear nombres completos
+                for alerta in alertas:
+                    alerta['nombre_completo'] = (
+                        f"{alerta['nombre']} {alerta['apellido_paterno']} "
+                        f"{alerta['apellido_materno'] or ''}"
+                    ).strip()
+                
+                return alertas
                 
         except Exception as e:
-            print(f"Error obteniendo alertas de baja asistencia: {e}")
+            print(f"Error obteniendo alertas: {e}")
             return [] 

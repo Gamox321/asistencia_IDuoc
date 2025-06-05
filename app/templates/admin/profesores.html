@@ -1,0 +1,351 @@
+{% extends "base_new.html" %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-8">
+        <h1 class="text-3xl font-bold text-gray-800">Gestión de Profesores</h1>
+        <button onclick="openModal('modalCrearProfesor')" class="btn-primary">
+            <i class="fas fa-plus mr-2"></i>Nuevo Profesor
+        </button>
+    </div>
+
+    <!-- Lista de Profesores -->
+    <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">RUT</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Roles</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Clases</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for profesor in profesores %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-gray-900">
+                                {{ profesor.nombre }} {{ profesor.apellido_paterno }} {{ profesor.apellido_materno }}
+                            </div>
+                            <div class="text-sm text-gray-500">
+                                {{ profesor.username }}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {{ profesor.rut }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {{ profesor.email }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% if profesor.roles %}
+                            {% for rol in profesor.roles.split(',') %}
+                            <span class="px-2 py-1 text-xs font-semibold rounded-full 
+                                       {% if 'admin' in rol.lower() %}
+                                       bg-red-100 text-red-800
+                                       {% elif 'profesor' in rol.lower() %}
+                                       bg-green-100 text-green-800
+                                       {% else %}
+                                       bg-blue-100 text-blue-800
+                                       {% endif %}">
+                                {{ rol }}
+                            </span>
+                            {% endfor %}
+                            {% else %}
+                            <span class="text-gray-500">Sin roles asignados</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {{ profesor.total_clases }} clases
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button onclick="openModal('modalEditarProfesor', {{ profesor|tojson }})" class="text-indigo-600 hover:text-indigo-900 mr-3">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button onclick="confirmarEliminar({{ profesor.id }})" class="text-red-600 hover:text-red-900">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Modal Crear Profesor -->
+    <div id="modalCrearProfesor" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="text-lg font-semibold">Nuevo Profesor</h3>
+                <button onclick="closeModal('modalCrearProfesor')" class="modal-close">&times;</button>
+            </div>
+            <form action="{{ url_for('main.admin_profesores') }}" method="POST">
+                <input type="hidden" name="accion" value="crear">
+                <div class="modal-body">
+                    <div class="grid grid-cols-1 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Nombre</label>
+                            <input type="text" name="nombre" required class="mt-1 form-input">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Apellido Paterno</label>
+                            <input type="text" name="apellido_paterno" required class="mt-1 form-input">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Apellido Materno</label>
+                            <input type="text" name="apellido_materno" required class="mt-1 form-input">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">RUT</label>
+                            <input type="text" name="rut" required class="mt-1 form-input" placeholder="12345678-9">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Email</label>
+                            <input type="email" name="email" required class="mt-1 form-input">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Nombre de Usuario</label>
+                            <input type="text" name="username" required class="mt-1 form-input">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Contraseña</label>
+                            <input type="password" name="password" required class="mt-1 form-input">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Roles</label>
+                            <div class="mt-2 space-y-2">
+                                {% for rol in roles %}
+                                <div class="flex items-center">
+                                    <input type="checkbox" name="roles" value="{{ rol.id }}" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                                    <label class="ml-2 text-sm text-gray-700">{{ rol.nombre }}</label>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" onclick="closeModal('modalCrearProfesor')" class="btn-secondary">Cancelar</button>
+                    <button type="submit" class="btn-primary">Crear Profesor</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Editar Profesor -->
+    <div id="modalEditarProfesor" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="text-lg font-semibold">Editar Profesor</h3>
+                <button onclick="closeModal('modalEditarProfesor')" class="modal-close">&times;</button>
+            </div>
+            <form action="{{ url_for('main.admin_profesores') }}" method="POST">
+                <input type="hidden" name="accion" value="editar">
+                <input type="hidden" name="profesor_id" id="editProfesorId">
+                <div class="modal-body">
+                    <div class="grid grid-cols-1 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Nombre</label>
+                            <input type="text" name="nombre" id="editNombre" required class="mt-1 form-input">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Apellido Paterno</label>
+                            <input type="text" name="apellido_paterno" id="editApellidoPaterno" required class="mt-1 form-input">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Apellido Materno</label>
+                            <input type="text" name="apellido_materno" id="editApellidoMaterno" required class="mt-1 form-input">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">RUT</label>
+                            <input type="text" name="rut" id="editRut" required class="mt-1 form-input">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Email</label>
+                            <input type="email" name="email" id="editEmail" required class="mt-1 form-input">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Roles</label>
+                            <div class="mt-2 space-y-2">
+                                {% for rol in roles %}
+                                <div class="flex items-center">
+                                    <input type="checkbox" name="roles" value="{{ rol.id }}" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                                           id="editRol{{ rol.id }}">
+                                    <label class="ml-2 text-sm text-gray-700">{{ rol.nombre }}</label>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" onclick="closeModal('modalEditarProfesor')" class="btn-secondary">Cancelar</button>
+                    <button type="submit" class="btn-primary">Guardar Cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Scripts -->
+<script>
+function openModal(modalId, data = null) {
+    document.getElementById(modalId).style.display = 'block';
+    if (data && modalId === 'modalEditarProfesor') {
+        document.getElementById('editProfesorId').value = data.id;
+        document.getElementById('editNombre').value = data.nombre;
+        document.getElementById('editApellidoPaterno').value = data.apellido_paterno;
+        document.getElementById('editApellidoMaterno').value = data.apellido_materno;
+        document.getElementById('editRut').value = data.rut;
+        document.getElementById('editEmail').value = data.email;
+        
+        // Marcar roles actuales
+        const roles = data.roles ? data.roles.split(',') : [];
+        document.querySelectorAll('input[name="roles"]').forEach(checkbox => {
+            checkbox.checked = roles.includes(checkbox.nextElementSibling.textContent.trim());
+        });
+    }
+}
+
+function closeModal(modalId) {
+    document.getElementById(modalId).style.display = 'none';
+}
+
+function confirmarEliminar(profesorId) {
+    if (confirm('¿Estás seguro de que deseas eliminar este profesor?')) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = "{{ url_for('main.admin_profesores') }}";
+        
+        const accionInput = document.createElement('input');
+        accionInput.type = 'hidden';
+        accionInput.name = 'accion';
+        accionInput.value = 'eliminar';
+        
+        const profesorIdInput = document.createElement('input');
+        profesorIdInput.type = 'hidden';
+        profesorIdInput.name = 'profesor_id';
+        profesorIdInput.value = profesorId;
+        
+        form.appendChild(accionInput);
+        form.appendChild(profesorIdInput);
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+// Cerrar modal al hacer clic fuera de él
+window.onclick = function(event) {
+    if (event.target.classList.contains('modal')) {
+        event.target.style.display = 'none';
+    }
+}
+</script>
+
+<style>
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+}
+
+.modal-content {
+    background-color: white;
+    margin: 10% auto;
+    padding: 0;
+    width: 90%;
+    max-width: 600px;
+    border-radius: 0.5rem;
+    box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.modal-close {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #6b7280;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.modal-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.btn-primary {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
+    font-weight: 500;
+    color: white;
+    background-color: #4f46e5;
+    border: 1px solid transparent;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    cursor: pointer;
+    transition: all 0.15s ease-in-out;
+}
+
+.btn-primary:hover {
+    background-color: #4338ca;
+}
+
+.btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
+    font-weight: 500;
+    color: #374151;
+    background-color: white;
+    border: 1px solid #d1d5db;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    cursor: pointer;
+    transition: all 0.15s ease-in-out;
+}
+
+.btn-secondary:hover {
+    background-color: #f3f4f6;
+}
+
+.form-input {
+    width: 100%;
+    padding: 0.5rem;
+    border-radius: 0.375rem;
+    border: 1px solid #d1d5db;
+}
+
+.form-select {
+    width: 100%;
+    padding: 0.5rem;
+    border-radius: 0.375rem;
+    border: 1px solid #d1d5db;
+    background-color: white;
+}
+</style>
+{% endblock %} 

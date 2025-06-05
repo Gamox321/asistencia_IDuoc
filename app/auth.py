@@ -3,14 +3,30 @@ Módulo de autenticación y seguridad mejorada
 Sistema de Asistencia DuocUC
 """
 
+from flask import Blueprint, session, request, redirect, url_for, flash, render_template
 from flask_bcrypt import Bcrypt
-from flask import session, request
+from flask_login import login_user, logout_user, login_required, current_user
+from functools import wraps
 import re
 from datetime import datetime, timedelta
 from .database import db
+from .models import User
+
+# Crear Blueprint de autenticación
+bp = Blueprint('auth', __name__, url_prefix='/auth')
 
 # Inicializar bcrypt
 bcrypt = Bcrypt()
+
+def require_login(f):
+    """Decorador para requerir login"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'usuario' not in session:
+            flash('Por favor inicie sesión', 'warning')
+            return redirect(url_for('main.login'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 class SecurityManager:
     """Gestor de seguridad del sistema"""
@@ -199,15 +215,138 @@ class PasswordMigrator:
         """Verificar si un hash es de bcrypt"""
         return password_hash.startswith('$2b$') and len(password_hash) == 60
 
-# Funciones helper para usar en las rutas
-def require_login():
-    """Verificar si el usuario está logueado"""
-    return 'usuario' in session and 'profesor_id' in session
+# Decorador para requerir rol de administrador
+def admin_required(f):
+    """Decorador para requerir rol de administrador"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'usuario' not in session:
+            flash('Por favor inicie sesión', 'warning')
+            return redirect(url_for('auth.login'))
+            
+        try:
+            with db.get_connection() as conexion:
+                cursor = conexion.cursor(dictionary=True)
+                cursor.execute("""
+                    SELECT tipo_usuario 
+                    FROM autenticacion 
+                    WHERE profesor_id = %s
+                """, (session.get('profesor_id'),))
+                
+                result = cursor.fetchone()
+                if not result or result['tipo_usuario'] != 'admin':
+                    flash('No tienes permisos de administrador', 'error')
+                    return redirect(url_for('main.dashboard'))
+                    
+        except Exception as e:
+            print(f"Error verificando rol admin: {e}")
+            flash('Error verificando permisos', 'error')
+            return redirect(url_for('main.dashboard'))
+            
+        return f(*args, **kwargs)
+    return decorated_function
 
 def get_current_user_id():
-    """Obtener ID del usuario actual"""
+    """Obtener el ID del usuario actual desde la sesión"""
     return session.get('profesor_id')
 
 def get_current_username():
-    """Obtener username del usuario actual"""
-    return session.get('usuario') 
+    """Obtener el nombre de usuario actual desde la sesión"""
+    return session.get('usuario')
+
+# Rutas de autenticación
+@bp.route('/login', methods=['GET', 'POST'])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('main.dashboard'))
+
+    if request.method == 'POST':
+        usuario = request.form.get('usuario')
+        password = request.form.get('password')
+        
+        # Validar campos requeridos
+        if not usuario or not password:
+            flash('Usuario y contraseña son requeridos', 'error')
+            return render_template('login.html')
+        
+        # Verificar bloqueo de cuenta
+        if SecurityManager.is_account_locked(usuario):
+            flash('Cuenta bloqueada temporalmente por múltiples intentos fallidos', 'error')
+            return render_template('login.html')
+        
+        try:
+            with db.get_connection() as conexion:
+                cursor = conexion.cursor(dictionary=True)
+                
+                # Buscar usuario
+                cursor.execute("""
+                    SELECT a.*, p.* 
+                    FROM autenticacion a
+                    JOIN profesores p ON a.id = p.id 
+                    WHERE a.usuario = %s
+                """, (usuario,))
+                
+                profesor = cursor.fetchone()
+                
+                # Registrar intento de login
+                ip_address, user_agent = SecurityManager.get_client_info()
+                
+                if not profesor:
+                    SecurityManager.log_login_attempt(usuario, False, ip_address, user_agent)
+                    flash('Usuario o contraseña incorrectos', 'error')
+                    return render_template('login.html')
+                
+                # Verificar contraseña
+                if not SecurityManager.check_password(password, profesor['password_hash']):
+                    SecurityManager.log_login_attempt(usuario, False, ip_address, user_agent)
+                    flash('Usuario o contraseña incorrectos', 'error')
+                    return render_template('login.html')
+                
+                # Login exitoso
+                SecurityManager.log_login_attempt(usuario, True, ip_address, user_agent)
+                SecurityManager.clear_failed_attempts(usuario)
+                
+                # Crear usuario y hacer login con Flask-Login
+                user = User(profesor)
+                login_user(user)
+                
+                # Crear sesión segura
+                SecurityManager.create_session(profesor['id'], profesor)
+                
+                flash('Bienvenido al sistema', 'success')
+                return redirect(url_for('main.dashboard'))
+                
+        except Exception as e:
+            print(f"Error en login: {e}")
+            flash('Error al iniciar sesión', 'error')
+            return render_template('login.html')
+    
+    return render_template('login.html')
+
+@bp.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    SecurityManager.logout_user()
+    flash('Has cerrado sesión exitosamente', 'success')
+    return redirect(url_for('auth.login'))
+
+def check_admin_access():
+    """Verifica si el usuario actual tiene acceso de administrador"""
+    try:
+        with db.get_connection() as conexion:
+            cursor = conexion.cursor(dictionary=True)
+            cursor.execute("""
+                SELECT tipo_usuario
+                FROM autenticacion
+                WHERE profesor_id = %s
+            """, (session.get('profesor_id'),))
+            
+            result = cursor.fetchone()
+            if not result or result['tipo_usuario'] != 'admin':
+                return False
+            return True
+            
+    except Exception as e:
+        print(f"Error verificando acceso admin: {e}")
+        return False 

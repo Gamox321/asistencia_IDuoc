@@ -1,238 +1,148 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reportes - Sistema de Asistencia DuocUC</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        .report-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-radius: 15px;
-            padding: 25px;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-            text-decoration: none;
-        }
-        .report-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.2);
-            color: white;
-            text-decoration: none;
-        }
-        .report-card.success {
-            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-        }
-        .report-card.warning {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-        }
-        .report-card.info {
-            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
-        }
-        .feature-list {
-            background: white;
-            border-radius: 15px;
-            padding: 20px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-        }
-    </style>
-</head>
-<body class="bg-light">
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-        <div class="container">
-            <a class="navbar-brand" href="{{ url_for('main.home') }}">
-                <i class="fas fa-graduation-cap"></i> DuocUC Asistencia
-            </a>
-            <div class="navbar-nav ms-auto">
-                <span class="navbar-text me-3">{{ nombre_profesor }}</span>
-                <a class="btn btn-outline-light btn-sm" href="{{ url_for('main.logout') }}">
-                    <i class="fas fa-sign-out-alt"></i> Cerrar Sesión
-                </a>
-            </div>
-        </div>
-    </nav>
+{% extends "base_new.html" %}
 
-    <div class="container mt-4">
-        <!-- Breadcrumb -->
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{{ url_for('main.home') }}">Inicio</a></li>
-                <li class="breadcrumb-item active">Reportes</li>
-            </ol>
-        </nav>
+{% block title %}Reportes{% endblock %}
 
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h1><i class="fas fa-chart-bar"></i> Sistema de Reportes</h1>
-            {% if role_context.is_coordinator or role_context.is_admin %}
-                <span class="badge bg-primary">{{ "Administrador" if role_context.is_admin else "Coordinador" }}</span>
-            {% endif %}
-        </div>
+{% block custom_styles %}
+.report-card {
+    @apply bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-xl p-6 mb-5 shadow-lg transform transition-transform duration-300 hover:scale-105 no-underline block;
+}
+.report-card:hover {
+    @apply -translate-y-1 shadow-xl text-white no-underline;
+}
+.report-card.success {
+    @apply from-blue-400 to-cyan-400;
+}
+.report-card.warning {
+    @apply from-pink-400 to-red-400;
+}
+.report-card.info {
+    @apply from-green-400 to-teal-400;
+}
+.feature-list {
+    @apply bg-white rounded-xl p-6 shadow-lg mb-5;
+}
+{% endblock %}
 
-        <!-- Descripción -->
-        <div class="alert alert-info">
-            <i class="fas fa-info-circle"></i>
-            <strong>Bienvenido al sistema de reportes.</strong> 
-            Aquí puedes generar, visualizar y exportar diferentes tipos de reportes de asistencia.
-        </div>
+{% block breadcrumb %}
+<nav class="text-gray-500 text-sm mb-4" aria-label="breadcrumb">
+    <ol class="list-none p-0 inline-flex">
+        <li class="flex items-center">
+            <a href="{{ url_for('main.home') }}" class="hover:text-blue-600">Inicio</a>
+            <svg class="fill-current w-3 h-3 mx-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512">
+                <path d="M285.476 272.971L91.132 467.314c-9.373 9.373-24.569 9.373-33.941 0l-22.667-22.667c-9.357-9.357-9.375-24.522-.04-33.901L188.505 256 34.484 101.255c-9.335-9.379-9.317-24.544.04-33.901l22.667-22.667c9.373-9.373 24.569-9.373 33.941 0L285.475 239.03c9.373 9.372 9.373 24.568.001 33.941z"/>
+            </svg>
+        </li>
+        <li class="text-gray-700">Reportes</li>
+    </ol>
+</nav>
+{% endblock %}
 
-        <!-- Tarjetas de reportes disponibles -->
-        <div class="row mb-4">
-            <div class="col-md-6">
-                <a href="{{ url_for('main.reporte_asistencia_clase') }}" class="report-card d-block">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h4><i class="fas fa-chart-line me-2"></i>Asistencia por Clase</h4>
-                            <p class="mb-2">Analiza la asistencia de cada clase con métricas detalladas</p>
-                            <ul class="list-unstyled small mb-0">
-                                <li><i class="fas fa-check me-1"></i> Porcentaje de asistencia por clase</li>
-                                <li><i class="fas fa-check me-1"></i> Filtros por fecha</li>
-                                <li><i class="fas fa-check me-1"></i> Exportación a Excel</li>
-                            </ul>
-                        </div>
-                        <i class="fas fa-arrow-right fa-2x opacity-75"></i>
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <h1 class="text-3xl font-bold text-gray-900 mb-8">Reportes y Análisis</h1>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <!-- Asistencia por Clase -->
+        <div class="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow">
+            <div class="flex items-start justify-between">
+                <div>
+                    <div class="flex items-center">
+                        <i class="fas fa-chart-line text-2xl text-blue-600 mr-3"></i>
+                        <h2 class="text-2xl font-semibold text-gray-900">Asistencia por Clase</h2>
                     </div>
-                </a>
-            </div>
-            
-            <div class="col-md-6">
-                <a href="{{ url_for('main.reporte_estudiantes') }}" class="report-card success d-block">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h4><i class="fas fa-users me-2"></i>Resumen de Estudiantes</h4>
-                            <p class="mb-2">Revisa el rendimiento de asistencia de cada estudiante</p>
-                            <ul class="list-unstyled small mb-0">
-                                <li><i class="fas fa-check me-1"></i> Historial por estudiante</li>
-                                <li><i class="fas fa-check me-1"></i> Filtros por clase</li>
-                                <li><i class="fas fa-check me-1"></i> Identificación de casos críticos</li>
-                            </ul>
-                        </div>
-                        <i class="fas fa-arrow-right fa-2x opacity-75"></i>
-                    </div>
+                    <p class="mt-2 text-gray-600">Analiza la asistencia de cada clase con métricas detalladas:</p>
+                    <ul class="mt-4 space-y-2 text-gray-600">
+                        <li class="flex items-center">
+                            <i class="fas fa-check-circle text-green-500 mr-2"></i>
+                            <span>Porcentaje de asistencia por clase</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-calendar text-blue-500 mr-2"></i>
+                            <span>Filtros por fecha</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-users text-purple-500 mr-2"></i>
+                            <span>Estadísticas de grupo</span>
+                        </li>
+                    </ul>
+                </div>
+                <a href="{{ url_for('main.reporte_asistencia_clase') }}" 
+                   class="inline-flex items-center text-blue-600 hover:text-blue-800">
+                    <span class="mr-2">Ver reporte</span>
+                    <i class="fas fa-arrow-right"></i>
                 </a>
             </div>
         </div>
 
-        <div class="row mb-4">
-            <div class="col-md-6">
-                <a href="{{ url_for('main.dashboard') }}" class="report-card warning d-block">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h4><i class="fas fa-chart-pie me-2"></i>Dashboard Interactivo</h4>
-                            <p class="mb-2">Visualiza estadísticas en tiempo real con gráficos</p>
-                            <ul class="list-unstyled small mb-0">
-                                <li><i class="fas fa-check me-1"></i> Métricas generales</li>
-                                <li><i class="fas fa-check me-1"></i> Gráficos interactivos</li>
-                                <li><i class="fas fa-check me-1"></i> Alertas automáticas</li>
-                            </ul>
-                        </div>
-                        <i class="fas fa-arrow-right fa-2x opacity-75"></i>
+        <!-- Dashboard Interactivo -->
+        <div class="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow">
+            <div class="flex items-start justify-between">
+                <div>
+                    <div class="flex items-center">
+                        <i class="fas fa-chart-pie text-2xl text-purple-600 mr-3"></i>
+                        <h2 class="text-2xl font-semibold text-gray-900">Dashboard Interactivo</h2>
                     </div>
+                    <p class="mt-2 text-gray-600">Visualiza estadísticas en tiempo real con gráficos dinámicos:</p>
+                    <ul class="mt-4 space-y-2 text-gray-600">
+                        <li class="flex items-center">
+                            <i class="fas fa-chart-bar text-orange-500 mr-2"></i>
+                            <span>Métricas generales</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-clock text-green-500 mr-2"></i>
+                            <span>Datos históricos</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-chart-line text-blue-500 mr-2"></i>
+                            <span>Análisis comparativos</span>
+                        </li>
+                    </ul>
+                </div>
+                <a href="{{ url_for('main.dashboard') }}" 
+                   class="inline-flex items-center text-purple-600 hover:text-purple-800">
+                    <span class="mr-2">Ver dashboard</span>
+                    <i class="fas fa-arrow-right"></i>
                 </a>
             </div>
-            
-            <div class="col-md-6">
-                <div class="report-card info opacity-75">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h4><i class="fas fa-calendar-alt me-2"></i>Reportes Programados</h4>
-                            <p class="mb-2">Automatiza la generación de reportes periódicos</p>
-                            <ul class="list-unstyled small mb-0">
-                                <li><i class="fas fa-clock me-1"></i> Próximamente disponible</li>
-                                <li><i class="fas fa-clock me-1"></i> Envío automático por email</li>
-                                <li><i class="fas fa-clock me-1"></i> Configuración personalizable</li>
-                            </ul>
-                        </div>
-                        <i class="fas fa-lock fa-2x opacity-50"></i>
-                    </div>
-                </div>
-            </div>
         </div>
 
-        <!-- Funcionalidades adicionales -->
-        <div class="row">
-            <div class="col-md-8">
-                <div class="feature-list">
-                    <h5><i class="fas fa-star text-warning"></i> Funcionalidades Destacadas</h5>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <ul class="list-group list-group-flush">
-                                <li class="list-group-item d-flex align-items-center">
-                                    <i class="fas fa-file-excel text-success me-3"></i>
-                                    <div>
-                                        <strong>Exportación Excel</strong>
-                                        <br><small class="text-muted">Descarga reportes en formato Excel</small>
-                                    </div>
-                                </li>
-                                <li class="list-group-item d-flex align-items-center">
-                                    <i class="fas fa-filter text-primary me-3"></i>
-                                    <div>
-                                        <strong>Filtros Avanzados</strong>
-                                        <br><small class="text-muted">Filtra por fechas, clases y estudiantes</small>
-                                    </div>
-                                </li>
-                            </ul>
-                        </div>
-                        <div class="col-md-6">
-                            <ul class="list-group list-group-flush">
-                                <li class="list-group-item d-flex align-items-center">
-                                    <i class="fas fa-chart-line text-info me-3"></i>
-                                    <div>
-                                        <strong>Gráficos Interactivos</strong>
-                                        <br><small class="text-muted">Visualiza tendencias y patrones</small>
-                                    </div>
-                                </li>
-                                <li class="list-group-item d-flex align-items-center">
-                                    <i class="fas fa-bell text-warning me-3"></i>
-                                    <div>
-                                        <strong>Alertas Automáticas</strong>
-                                        <br><small class="text-muted">Detecta casos de baja asistencia</small>
-                                    </div>
-                                </li>
-                            </ul>
-                        </div>
+        <!-- Reportes Programados -->
+        <div class="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow">
+            <div class="flex items-start justify-between">
+                <div>
+                    <div class="flex items-center">
+                        <i class="fas fa-calendar-alt text-2xl text-green-600 mr-3"></i>
+                        <h2 class="text-2xl font-semibold text-gray-900">Reportes Programados</h2>
                     </div>
+                    <p class="mt-2 text-gray-600">Automatiza la generación y envío de reportes:</p>
+                    <ul class="mt-4 space-y-2 text-gray-600">
+                        <li class="flex items-center">
+                            <i class="fas fa-clock text-blue-500 mr-2"></i>
+                            <span>Programación personalizable</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-envelope text-purple-500 mr-2"></i>
+                            <span>Envío automático por email</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-file-export text-green-500 mr-2"></i>
+                            <span>Múltiples formatos de exportación</span>
+                        </li>
+                    </ul>
                 </div>
-            </div>
-            
-            <div class="col-md-4">
-                <div class="feature-list text-center">
-                    <h5><i class="fas fa-question-circle text-info"></i> ¿Necesitas Ayuda?</h5>
-                    <p class="text-muted">Si tienes dudas sobre cómo usar los reportes, consulta nuestra guía o contacta al soporte técnico.</p>
-                    <button class="btn btn-outline-primary btn-sm" onclick="alert('Función en desarrollo')">
-                        <i class="fas fa-book"></i> Ver Guía
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Acciones rápidas -->
-        <div class="row mt-4">
-            <div class="col-12">
-                <div class="feature-list">
-                    <h5><i class="fas fa-bolt"></i> Acciones Rápidas</h5>
-                    <div class="d-flex flex-wrap gap-2">
-                        <a href="{{ url_for('main.reporte_asistencia_clase') }}" class="btn btn-primary">
-                            <i class="fas fa-download"></i> Generar Reporte
-                        </a>
-                        <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-secondary">
-                            <i class="fas fa-chart-pie"></i> Ver Dashboard
-                        </a>
-                        <a href="{{ url_for('main.ver_clases') }}" class="btn btn-outline-success">
-                            <i class="fas fa-chalkboard-teacher"></i> Mis Clases
-                        </a>
-                        <a href="{{ url_for('main.home') }}" class="btn btn-outline-info">
-                            <i class="fas fa-home"></i> Inicio
-                        </a>
-                    </div>
-                </div>
+                {% if role_context.is_coordinator or role_context.is_admin %}
+                <a href="#" class="inline-flex items-center text-green-600 hover:text-green-800">
+                    <span class="mr-2">Configurar</span>
+                    <i class="fas fa-arrow-right"></i>
+                </a>
+                {% else %}
+                <span class="inline-flex items-center text-gray-400">
+                    <i class="fas fa-lock mr-2"></i>
+                    <span>Acceso restringido</span>
+                </span>
+                {% endif %}
             </div>
         </div>
     </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html> 
+</div>
+{% endblock %} 

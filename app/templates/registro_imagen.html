@@ -1,0 +1,213 @@
+{% extends "base_new.html" %}
+
+{% block title %}Registro de Imagen{% endblock %}
+
+{% block custom_styles %}
+.main-container {
+    @apply container mx-auto px-4 py-6;
+    max-width: 800px;
+}
+
+.camera-section {
+    @apply bg-white rounded-xl shadow-lg p-6 mb-6;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.video-wrapper {
+    @apply relative my-6;
+    width: 640px;
+    height: 480px;
+    background: #000;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+#video {
+    @apply absolute top-0 left-0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+#canvas {
+    @apply absolute top-0 left-0;
+    width: 100%;
+    height: 100%;
+}
+
+.camera-controls {
+    @apply flex items-center justify-center gap-4 mt-4;
+}
+
+.camera-button {
+    @apply inline-flex items-center px-4 py-2 bg-blue-600 text-white font-medium 
+    hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 
+    transition-colors duration-200 rounded-md;
+}
+
+.camera-button.disabled {
+    @apply opacity-50 cursor-not-allowed;
+}
+
+.status-message {
+    @apply mt-4 text-center;
+}
+
+.status-message.success {
+    @apply text-green-600;
+}
+
+.status-message.error {
+    @apply text-red-600;
+}
+
+.status-message.processing {
+    @apply text-blue-600;
+}
+
+@media (max-width: 768px) {
+    .video-wrapper {
+        width: 100%;
+        max-width: 640px;
+        height: 360px;
+    }
+}
+{% endblock %}
+
+{% block content %}
+<div class="main-container">
+    <div class="bg-white rounded-xl shadow-lg p-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">Registro de Imagen para Reconocimiento Facial</h2>
+        
+        <div class="camera-section">
+            <p class="text-gray-600 mb-4 text-center">
+                Para poder usar el sistema de asistencia facial, necesitamos registrar una foto clara de tu rostro.
+                Por favor, asegúrate de estar en un lugar bien iluminado y mira directamente a la cámara.
+            </p>
+            
+            <div class="video-wrapper">
+                <video id="video" playsinline autoplay></video>
+                <canvas id="canvas"></canvas>
+            </div>
+            
+            <div class="camera-controls">
+                <button id="startCamera" class="camera-button">
+                    <i class="fas fa-camera mr-2"></i>
+                    Iniciar Cámara
+                </button>
+                <button id="capturePhoto" class="camera-button" disabled>
+                    <i class="fas fa-camera-retro mr-2"></i>
+                    Capturar Foto
+                </button>
+            </div>
+            
+            <div id="statusMessage" class="status-message"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let videoStream = null;
+const video = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const startButton = document.getElementById('startCamera');
+const captureButton = document.getElementById('capturePhoto');
+const statusDiv = document.getElementById('statusMessage');
+const ctx = canvas.getContext('2d');
+
+// Iniciar la cámara
+async function startCamera() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { 
+                width: { ideal: 640 },
+                height: { ideal: 480 },
+                facingMode: "user"
+            } 
+        });
+        video.srcObject = stream;
+        videoStream = stream;
+        startButton.disabled = true;
+        captureButton.disabled = false;
+        statusDiv.textContent = "Cámara iniciada. Puede capturar foto.";
+        statusDiv.className = "status-message success";
+    } catch (err) {
+        console.error("Error al acceder a la cámara:", err);
+        statusDiv.textContent = "Error al acceder a la cámara. Por favor, verifique los permisos.";
+        statusDiv.className = "status-message error";
+    }
+}
+
+// Detener la cámara
+function stopCamera() {
+    if (videoStream) {
+        videoStream.getTracks().forEach(track => track.stop());
+        video.srcObject = null;
+        videoStream = null;
+        startButton.disabled = false;
+        captureButton.disabled = true;
+    }
+}
+
+// Capturar foto y enviar para registro
+async function capturePhoto() {
+    if (!videoStream) return;
+
+    // Dibujar el frame actual del video en el canvas
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    // Convertir a base64
+    const imageData = canvas.toDataURL('image/jpeg');
+
+    // Mostrar estado de procesamiento
+    statusDiv.textContent = "Procesando imagen...";
+    statusDiv.className = "status-message processing";
+
+    try {
+        // Enviar la imagen al servidor
+        const response = await fetch('/registrar_imagen_alumno', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                image_data: imageData,
+                alumno_id: '{{ alumno.id }}'  // El ID del alumno debe ser pasado desde el servidor
+            })
+        });
+
+        const data = await response.json();
+        
+        if (data.success) {
+            statusDiv.textContent = "¡Imagen registrada correctamente!";
+            statusDiv.className = "status-message success";
+            
+            // Redirigir después de un breve delay
+            setTimeout(() => {
+                window.location.href = '/dashboard';
+            }, 2000);
+        } else {
+            statusDiv.textContent = data.message || "Error al registrar la imagen";
+            statusDiv.className = "status-message error";
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        statusDiv.textContent = "Error al procesar la imagen";
+        statusDiv.className = "status-message error";
+    }
+}
+
+// Event Listeners
+startButton.addEventListener('click', startCamera);
+captureButton.addEventListener('click', capturePhoto);
+
+// Cleanup al salir de la página
+window.addEventListener('beforeunload', stopCamera);
+</script>
+{% endblock %} 

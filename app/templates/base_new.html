@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}Sistema de Asistencia{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- AOS Animations -->
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        AOS.init();
+      });
+      window.addEventListener('load', () => {
+        AOS.refresh();
+      });
+    </script>
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" 
+          integrity="sha512-9usAa10IRO0HhonpyAIVpjrylPvoDwiPUiKdWk5t3PyolY1cOd4DSE0Ga+ri4AuTroPR5aQvXU9xC6qOPnzFeg==" 
+          crossorigin="anonymous" 
+          referrerpolicy="no-referrer" />
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    {% block head_extra %}{% endblock %}
+
+    <style>
+      {% block custom_styles %}{% endblock %}
+
+      /* Estilos base para botones */
+      .btn-primary {
+          @apply bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition flex items-center;
+      }
+      .btn-success {
+          @apply bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition flex items-center;
+      }
+      .btn-info {
+          @apply bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition flex items-center;
+      }
+      .btn-warning {
+          @apply bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg transition flex items-center;
+      }
+      .btn-danger {
+          @apply bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition flex items-center;
+      }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 min-h-screen flex flex-col">
+    <!-- Barra de navegación -->
+    <nav class="bg-gray-900 text-white py-3 px-6 shadow-md">
+        <div class="container mx-auto flex justify-between items-center">
+            <!-- Logo y nombre -->
+            <div class="flex items-center space-x-4">
+                <a href="{{ url_for('main.home') }}" class="flex items-center space-x-2">
+                    <img src="/static/img/logo.png" alt="Logo" class="w-10 h-10">
+                    <span class="text-lg font-semibold">IDuoc Asistencia</span>
+                </a>
+            </div>
+
+            <!-- Menú de navegación -->
+            {% if session.get('usuario') %}
+            <div class="hidden md:flex items-center space-x-6">
+                <!-- Botón Dashboard -->
+                <a href="{{ url_for('main.dashboard') }}" class="flex items-center space-x-2 hover:text-blue-400 transition">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Dashboard</span>
+                </a>
+
+                <!-- Botón Ver Mis Clases -->
+                <a href="{{ url_for('main.ver_clases') }}" class="flex items-center space-x-2 hover:text-blue-400 transition">
+                    <i class="fas fa-chalkboard"></i>
+                    <span>Ver Mis Clases</span>
+                </a>
+
+                <!-- Botón Reportes -->
+                <a href="{{ url_for('main.reportes') }}" class="flex items-center space-x-2 hover:text-orange-400 transition">
+                    <i class="fas fa-file-alt"></i>
+                    <span>Reportes</span>
+                </a>
+
+                <!-- Botón Panel Admin (solo para administradores) -->
+                {% if session.get('es_admin') %}
+                <a href="/admin" class="flex items-center space-x-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition cursor-pointer">
+                    <i class="fas fa-cog"></i>
+                    <span>Panel Admin</span>
+                </a>
+                {% endif %}
+
+                <!-- Menú de usuario simplificado -->
+                <div class="flex items-center space-x-2">
+                    <span class="text-gray-300">{{ session.get('nombre_profesor', 'Usuario') }}</span>
+                    <a href="{{ url_for('main.logout') }}" class="text-red-400 hover:text-red-300 transition">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Menú móvil -->
+            <div class="md:hidden">
+                <button class="mobile-menu-button">
+                    <i class="fas fa-bars text-2xl"></i>
+                </button>
+            </div>
+            {% endif %}
+        </div>
+    </nav>
+
+    <!-- Menú móvil expandible -->
+    {% if session.get('usuario') %}
+    <div class="mobile-menu hidden md:hidden">
+        <div class="px-4 py-3 space-y-3 bg-gray-800">
+            <a href="{{ url_for('main.dashboard') }}" class="block text-white hover:bg-gray-700 px-3 py-2 rounded-md">
+                <i class="fas fa-chart-line mr-2"></i>Dashboard
+            </a>
+            <a href="{{ url_for('main.ver_clases') }}" class="block text-white hover:bg-gray-700 px-3 py-2 rounded-md">
+                <i class="fas fa-chalkboard mr-2"></i>Ver Mis Clases
+            </a>
+            <a href="{{ url_for('main.reportes') }}" class="block text-white hover:bg-gray-700 px-3 py-2 rounded-md">
+                <i class="fas fa-file-alt mr-2"></i>Reportes
+            </a>
+            {% if session.get('es_admin') %}
+            <a href="/admin" class="block text-white bg-red-600 hover:bg-red-700 px-3 py-2 rounded-md cursor-pointer">
+                <i class="fas fa-cog mr-2"></i>Panel Admin
+            </a>
+            {% endif %}
+            <div class="border-t border-gray-700 my-2"></div>
+            <div class="px-3 py-2 text-gray-300">
+                {{ session.get('nombre_profesor', 'Usuario') }}
+            </div>
+            <a href="{{ url_for('main.logout') }}" class="block text-red-400 hover:bg-gray-700 px-3 py-2 rounded-md">
+                <i class="fas fa-sign-out-alt mr-2"></i>Cerrar Sesión
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Scripts para el menú móvil -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const mobileMenuButton = document.querySelector('.mobile-menu-button');
+            const mobileMenu = document.querySelector('.mobile-menu');
+
+            if (mobileMenuButton && mobileMenu) {
+                mobileMenuButton.addEventListener('click', function() {
+                    mobileMenu.classList.toggle('hidden');
+                });
+            }
+
+            // Debug para el botón de admin
+            const adminButtons = document.querySelectorAll('[href="{{ url_for('main.admin') }}"]');
+            console.log('Total admin buttons found:', adminButtons.length);
+            
+            function navigateToAdmin() {
+                const targetUrl = "{{ url_for('main.admin') }}";
+                console.log('Attempting navigation to:', targetUrl);
+                
+                // Método 1: window.location
+                try {
+                    console.log('Trying method 1: window.location');
+                    window.location = targetUrl;
+                    return;
+                } catch(error) {
+                    console.error('Method 1 failed:', error);
+                }
+                
+                // Método 2: window.location.href
+                try {
+                    console.log('Trying method 2: window.location.href');
+                    window.location.href = targetUrl;
+                    return;
+                } catch(error) {
+                    console.error('Method 2 failed:', error);
+                }
+                
+                // Método 3: window.location.replace
+                try {
+                    console.log('Trying method 3: window.location.replace');
+                    window.location.replace(targetUrl);
+                    return;
+                } catch(error) {
+                    console.error('Method 3 failed:', error);
+                }
+                
+                // Método 4: form submit
+                console.log('Trying method 4: form submit');
+                const form = document.createElement('form');
+                form.method = 'GET';
+                form.action = targetUrl;
+                document.body.appendChild(form);
+                form.submit();
+            }
+            
+            adminButtons.forEach(button => {
+                console.log('Configuring admin button:', button.className);
+                button.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    console.log('Admin button clicked');
+                    console.log('Button href:', this.getAttribute('href'));
+                    console.log('Session es_admin:', {{ 'true' if session.get('es_admin') else 'false' }});
+                    navigateToAdmin();
+                });
+            });
+        });
+    </script>
+
+    <!-- Contenido principal -->
+    <div class="flex-grow container mx-auto p-6">
+        <!-- Breadcrumb -->
+        {% block breadcrumb %}{% endblock %}
+
+        <!-- Contenido específico de la página -->
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Scripts adicionales -->
+    {% block scripts %}{% endblock %}
+</body>
+</html> 

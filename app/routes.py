@@ -13,11 +13,19 @@ from datetime import datetime, date, timedelta
 from .config import Config
 from .database import db
 from .auth import SecurityManager, PasswordMigrator, require_login, get_current_user_id
-from .roles import RoleManager, professor_required, coordinator_required, get_user_role_context
+from .roles import RoleManager, professor_required, coordinator_required, get_user_role_context, admin_required
 from .reports import ReportManager
+from werkzeug.utils import secure_filename
+from werkzeug.security import generate_password_hash
+from flask_login import current_user
+from .facial_recognition import facial_recognition
+from .models import db, Profesor, Alumno, Clase, Asistencia
 
 # Crear Blueprint para las rutas
-bp = Blueprint('main', __name__)
+bp = Blueprint('main', __name__, url_prefix='')
+
+UPLOAD_FOLDER = 'app/static/uploads/justificaciones'
+ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg'}
 
 def get_db():
     """Función helper para obtener conexión a la base de datos MySQL"""
@@ -39,12 +47,43 @@ def timedelta_to_time_string(td):
         except:
             return str(td)
 
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+@bp.context_processor
+def inject_role_context():
+    """Inyectar contexto de roles en los templates"""
+    if not current_user.is_authenticated:
+        return {
+            'role_context': {
+                'is_admin': False,
+                'is_coordinator': False,
+                'is_professor': False
+            }
+        }
+    
+    return {
+        'role_context': {
+            'is_admin': current_user.is_admin,
+            'is_coordinator': current_user.is_coordinator,
+            'is_professor': True
+        }
+    }
+
+# ---------- RUTAS PÚBLICAS ----------
+@bp.route('/inicio')
+def inicio_publico():
+    """Página de inicio pública"""
+    return render_template('inicio_publico.html')
+
 # ---------- LOGIN MEJORADO ----------
 @bp.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
+        
+        print(f"DEBUG Login - Intento de inicio de sesión para usuario: {username}")
         
         # Obtener información del cliente
         ip_address, user_agent = SecurityManager.get_client_info()
@@ -63,9 +102,11 @@ def login():
                            p.id as profesor_id, p.nombre, p.apellido_paterno, p.apellido_materno, p.usuario
                     FROM autenticacion a
                     JOIN profesor p ON a.profesor_id = p.id
-                    WHERE a.usuario = %s AND p.estado = 'activo'
+                    WHERE p.usuario = %s AND p.estado = 'activo'
                 """, (username,))
                 usuario_data = cursor.fetchone()
+
+                print(f"DEBUG Login - Datos del usuario encontrado: {usuario_data}")
 
             if usuario_data:
                 password_hash = usuario_data['password_hash']
@@ -101,7 +142,18 @@ def login():
                     SecurityManager.log_login_attempt(username, True, ip_address, user_agent)
                     
                     # Crear sesión segura
-                    SecurityManager.create_session(usuario_data['profesor_id'], usuario_data)
+                    session.clear()  # Limpiar sesión anterior
+                    session['usuario'] = usuario_data['usuario']
+                    session['profesor_id'] = usuario_data['profesor_id']
+                    session['nombre_profesor'] = f"{usuario_data['nombre']} {usuario_data['apellido_paterno']}"
+                    session['es_admin'] = usuario_data['tipo_usuario'] == 'admin'
+                    session['login_time'] = datetime.now().isoformat()
+                    session['last_activity'] = datetime.now().isoformat()
+                    session.permanent = True
+                    
+                    print(f"DEBUG Login - Sesión creada: {dict(session)}")
+                    print(f"DEBUG Login - Tipo usuario: {usuario_data['tipo_usuario']}")
+                    print(f"DEBUG Login - Es admin: {session['es_admin']}")
                     
                     # Actualizar último login
                     try:
@@ -110,8 +162,8 @@ def login():
                             cursor.execute("""
                                 UPDATE autenticacion 
                                 SET ultimo_login = CURRENT_TIMESTAMP 
-                                WHERE usuario = %s
-                            """, (username,))
+                                WHERE id = %s
+                            """, (usuario_data['id'],))
                             conexion.commit()
                     except Error as e:
                         print(f"Error actualizando último login: {e}")
@@ -141,18 +193,12 @@ def logout():
     flash('Sesión cerrada correctamente', 'info')
     return redirect(url_for('main.login'))
 
-# ---------- VISTA PRINCIPAL MEJORADA ----------
+# ---------- HOME MEJORADO ----------
 @bp.route('/')
 def home():
-    if not require_login():
-        return render_template('inicio_publico.html')
-    
-    # Verificar timeout de sesión
-    if SecurityManager.check_session_timeout():
-        flash('Tu sesión ha expirado', 'warning')
-        return redirect(url_for('main.logout'))
-
-    # Página para profesor autenticado
+    if 'usuario' not in session:
+        return redirect(url_for('main.inicio_publico'))
+        
     try:
         profesor_id = get_current_user_id()
         nombre_profesor = session.get('nombre_profesor')
@@ -160,22 +206,34 @@ def home():
         if not profesor_id:
             return redirect(url_for('main.logout'))
 
+        # Obtener contexto de roles
+        role_context = get_user_role_context(profesor_id)
+
         with get_db() as conexion:
             cursor = conexion.cursor(dictionary=True)
             cursor.execute("""
-                SELECT c.id, c.nombre, c.fecha, c.hora_inicio, c.hora_fin, c.sala,
-                       s.codigo as seccion_codigo, pa.año, pa.semestre
+                SELECT 
+                    c.id, c.nombre, c.fecha, c.hora_inicio, c.hora_fin, c.sala,
+                    s.codigo as seccion_codigo, 
+                    pa.año, pa.semestre,
+                    COUNT(DISTINCT ac.alumno_id) as total_alumnos,
+                    COUNT(DISTINCT CASE WHEN a.presente = 1 THEN a.alumno_id END) as alumnos_presentes
                 FROM clase c
-                JOIN profesor_clase pc ON c.id = pc.clase_id
                 JOIN seccion s ON c.seccion_id = s.id
                 JOIN periodo_academico pa ON c.periodo_academico_id = pa.id
-                WHERE pc.profesor_id = %s AND pa.estado = 'activo'
+                LEFT JOIN alumno_clase ac ON c.id = ac.clase_id AND ac.estado = 'inscrito'
+                LEFT JOIN asistencia a ON c.id = a.clase_id AND a.alumno_id = ac.alumno_id
+                WHERE c.profesor_id = %s AND c.estado = 'activa'
+                GROUP BY c.id, c.nombre, c.fecha, c.hora_inicio, c.hora_fin, c.sala, s.codigo, pa.año, pa.semestre
                 ORDER BY c.fecha DESC, c.hora_inicio DESC
             """, (profesor_id,))
             clases = cursor.fetchall()
 
-        return render_template('index.html', nombre_profesor=nombre_profesor, clases=clases)
-    
+        return render_template('index.html', 
+                        nombre_profesor=nombre_profesor, 
+                        clases=clases,
+                        role_context=role_context)
+
     except Error as e:
         print(f"Error en home: {e}")
         flash('Error cargando las clases', 'error')
@@ -183,40 +241,46 @@ def home():
 
 # ---------- VER CLASES MEJORADO ----------
 @bp.route('/clases')
+@require_login
 def ver_clases():
-    if not require_login():
-        return redirect(url_for('main.login'))
-    
-    # Verificar timeout de sesión
-    if SecurityManager.check_session_timeout():
-        flash('Tu sesión ha expirado', 'warning')
-        return redirect(url_for('main.logout'))
-
     try:
         profesor_id = get_current_user_id()
         nombre_profesor = session.get('nombre_profesor')
         
         if not profesor_id:
-            return redirect(url_for('main.logout'))
+            flash('Sesión no válida', 'error')
+            return redirect(url_for('main.login'))
+
+        # Actualizar timestamp de última actividad
+        session['last_activity'] = datetime.now().isoformat()
+
+        # Obtener contexto de roles
+        role_context = get_user_role_context(profesor_id)
 
         with get_db() as conexion:
             cursor = conexion.cursor(dictionary=True)
             cursor.execute("""
-                SELECT c.id, c.nombre, c.fecha, c.hora_inicio, c.hora_fin, c.sala,
-                       s.codigo as seccion_codigo, pa.año, pa.semestre,
-                       COUNT(ac.alumno_id) as total_alumnos
+                SELECT 
+                    c.id, c.nombre, c.fecha, c.hora_inicio, c.hora_fin, c.sala,
+                    s.codigo as seccion_codigo, 
+                    pa.año, pa.semestre,
+                    COUNT(DISTINCT ac.alumno_id) as total_alumnos,
+                    COUNT(DISTINCT CASE WHEN a.presente = 1 THEN a.alumno_id END) as alumnos_presentes
                 FROM clase c
-                JOIN profesor_clase pc ON c.id = pc.clase_id
                 JOIN seccion s ON c.seccion_id = s.id
                 JOIN periodo_academico pa ON c.periodo_academico_id = pa.id
                 LEFT JOIN alumno_clase ac ON c.id = ac.clase_id AND ac.estado = 'inscrito'
-                WHERE pc.profesor_id = %s AND pa.estado = 'activo'
+                LEFT JOIN asistencia a ON c.id = a.clase_id
+                WHERE c.profesor_id = %s AND c.estado = 'activa'
                 GROUP BY c.id, c.nombre, c.fecha, c.hora_inicio, c.hora_fin, c.sala, s.codigo, pa.año, pa.semestre
                 ORDER BY c.fecha DESC, c.hora_inicio DESC
             """, (profesor_id,))
             clases = cursor.fetchall()
 
-        return render_template('clases.html', nombre_profesor=nombre_profesor, clases=clases)
+        return render_template('clases.html', 
+                            nombre_profesor=nombre_profesor, 
+                            clases=clases,
+                            role_context=role_context)
     
     except Error as e:
         print(f"Error en ver_clases: {e}")
@@ -225,55 +289,60 @@ def ver_clases():
 
 # ---------- ASISTENCIA MEJORADA ----------
 @bp.route('/asistencia/<int:clase_id>')
+@require_login
 def asistencia(clase_id):
-    if not require_login():
-        return redirect(url_for('main.login'))
-    
-    # Verificar timeout de sesión
-    if SecurityManager.check_session_timeout():
-        flash('Tu sesión ha expirado', 'warning')
-        return redirect(url_for('main.logout'))
-
     try:
+        profesor_id = get_current_user_id()
+        if not profesor_id:
+            flash('Sesión no válida', 'error')
+            return redirect(url_for('main.login'))
+
+        # Actualizar timestamp de última actividad
+        session['last_activity'] = datetime.now().isoformat()
+
+        # Obtener contexto de roles
+        role_context = get_user_role_context(profesor_id)
+
         with get_db() as conexion:
             cursor = conexion.cursor(dictionary=True)
             
-            # Verificar que el profesor tiene acceso a esta clase
-            profesor_id = get_current_user_id()
+            # Verificar que el profesor tenga acceso a esta clase
             cursor.execute("""
-                SELECT 1 FROM profesor_clase 
-                WHERE profesor_id = %s AND clase_id = %s
-            """, (profesor_id, clase_id))
+                SELECT 1
+                FROM clase c
+                WHERE c.id = %s AND c.profesor_id = %s
+            """, (clase_id, profesor_id))
             
             if not cursor.fetchone():
                 flash('No tienes acceso a esta clase', 'error')
                 return redirect(url_for('main.home'))
             
-            # Obtener alumnos inscritos en la clase
+            # Obtener lista de alumnos y su asistencia
             cursor.execute("""
-                SELECT a.id, a.nombre, a.apellido_paterno, a.apellido_materno, a.rut
+                SELECT 
+                    a.id as alumno_id,
+                    a.nombre,
+                    a.apellido_paterno,
+                    a.apellido_materno,
+                    a.rut,
+                    COALESCE(ast.presente, 0) as presente,
+                    ast.id as asistencia_id,
+                    ast.fecha_asistencia,
+                    ast.timestamp as hora_registro
                 FROM alumno a
                 JOIN alumno_clase ac ON a.id = ac.alumno_id
+                LEFT JOIN asistencia ast ON a.id = ast.alumno_id AND ast.clase_id = %s
                 WHERE ac.clase_id = %s AND ac.estado = 'inscrito'
                 ORDER BY a.apellido_paterno, a.apellido_materno, a.nombre
-            """, (clase_id,))
-            alumnos_raw = cursor.fetchall()
+            """, (clase_id, clase_id))
             
-            # Formatear alumnos para compatibilidad con el template
-            alumnos = []
-            for a in alumnos_raw:
-                alumnos.append({
-                    "id": a['id'],
-                    "nombre": f"{a['nombre']} {a['apellido_paterno']} {a['apellido_materno'] or ''}".strip(),
-                    "rut": a['rut']
-                })
+            alumnos = cursor.fetchall()
             
             # Obtener todas las clases disponibles para el select
             cursor.execute("""
                 SELECT c.id, c.nombre
                 FROM clase c
-                JOIN profesor_clase pc ON c.id = pc.clase_id
-                WHERE pc.profesor_id = %s
+                WHERE c.profesor_id = %s AND c.estado = 'activa'
                 ORDER BY c.fecha DESC
             """, (profesor_id,))
             clases_disponibles = cursor.fetchall()
@@ -281,7 +350,9 @@ def asistencia(clase_id):
         return render_template('asistencia.html', 
                              alumnos=alumnos, 
                              clase_id=clase_id, 
-                             clases=clases_disponibles)
+                             clases=clases_disponibles,
+                             role_context=role_context,
+                             nombre_profesor=session.get('nombre_profesor'))
     
     except Error as e:
         print(f"Error en asistencia: {e}")
@@ -596,10 +667,8 @@ def guardar_datos_faciales(alumno_id, datos_rostro):
 
 # ---------- HISTORIAL ASISTENCIA ----------
 @bp.route('/historial_asistencia/<int:clase_id>')
+@require_login
 def historial_asistencia(clase_id):
-    if 'usuario' not in session:
-        return redirect(url_for('main.login'))
-
     try:
         with get_db() as conexion:
             cursor = conexion.cursor(dictionary=True)
@@ -617,7 +686,17 @@ def historial_asistencia(clase_id):
 
             # Obtener información de la clase
             cursor.execute("""
-                SELECT c.nombre, s.codigo as seccion_codigo
+                SELECT 
+                    c.nombre,
+                    s.codigo as seccion,
+                    CONCAT(TIME_FORMAT(c.hora_inicio, '%H:%i'), ' - ', TIME_FORMAT(c.hora_fin, '%H:%i')) as horario,
+                    (SELECT COUNT(DISTINCT fecha_asistencia) FROM asistencia WHERE clase_id = c.id) as total_clases,
+                    (SELECT COUNT(*) FROM alumno_clase WHERE clase_id = c.id AND estado = 'inscrito') as total_estudiantes,
+                    (
+                        SELECT ROUND(AVG(presente) * 100, 1)
+                        FROM asistencia
+                        WHERE clase_id = c.id
+                    ) as promedio_asistencia
                 FROM clase c
                 JOIN seccion s ON c.seccion_id = s.id
                 WHERE c.id = %s
@@ -627,50 +706,51 @@ def historial_asistencia(clase_id):
             if not clase_info:
                 flash('Clase no encontrada', 'error')
                 return redirect(url_for('main.home'))
-                
-            nombre_clase = f"{clase_info['nombre']} - {clase_info['seccion_codigo']}"
 
-            # Obtener registros de asistencia agrupados por fecha
+            # Obtener lista de estudiantes con sus estadísticas
             cursor.execute("""
                 SELECT 
-                    a.fecha_asistencia as fecha,
-                    COUNT(*) as total_alumnos,
-                    SUM(a.presente) as asistentes,
-                    ROUND((SUM(a.presente) * 100.0 / COUNT(*)), 1) as porcentaje
-                FROM asistencia a
-                WHERE a.clase_id = %s
-                GROUP BY a.fecha_asistencia
-                ORDER BY a.fecha_asistencia DESC
-            """, (clase_id,))
+                    a.id,
+                    a.nombre,
+                    a.apellido_paterno,
+                    a.apellido_materno,
+                    a.rut,
+                    COUNT(ast.id) as clases_asistidas,
+                    (
+                        SELECT COUNT(DISTINCT fecha_asistencia) 
+                        FROM asistencia 
+                        WHERE clase_id = %s
+                    ) as total_clases,
+                    CASE 
+                        WHEN COUNT(ast.id) > 0 THEN 
+                            ROUND((COUNT(CASE WHEN ast.presente = 1 THEN 1 END) * 100.0 / COUNT(ast.id)), 1)
+                        ELSE NULL
+                    END as porcentaje_asistencia,
+                    MAX(ast.fecha_asistencia) as ultima_asistencia
+                FROM alumno a
+                JOIN alumno_clase ac ON a.id = ac.alumno_id
+                LEFT JOIN asistencia ast ON a.id = ast.alumno_id AND ast.clase_id = %s
+                WHERE ac.clase_id = %s AND ac.estado = 'inscrito'
+                GROUP BY a.id, a.nombre, a.apellido_paterno, a.apellido_materno, a.rut
+                ORDER BY a.apellido_paterno, a.apellido_materno, a.nombre
+            """, (clase_id, clase_id, clase_id))
             
-            registros = cursor.fetchall()
+            estudiantes = cursor.fetchall()
             
-            # Obtener detalles de cada fecha para el modal
-            detalles_por_fecha = {}
-            for registro in registros:
-                fecha = registro['fecha']
-                cursor.execute("""
-                    SELECT 
-                        a.nombre,
-                        a.apellido_paterno,
-                        a.apellido_materno,
-                        a.rut,
-                        ast.presente,
-                        ast.timestamp
-                    FROM asistencia ast
-                    JOIN alumno a ON ast.alumno_id = a.id
-                    WHERE ast.clase_id = %s AND ast.fecha_asistencia = %s
-                    ORDER BY a.apellido_paterno, a.apellido_materno, a.nombre
-                """, (clase_id, fecha))
-                
-                alumnos_fecha = cursor.fetchall()
-                detalles_por_fecha[str(fecha)] = alumnos_fecha
+            # Procesar los datos de los estudiantes
+            for estudiante in estudiantes:
+                estudiante['nombre'] = f"{estudiante['nombre']} {estudiante['apellido_paterno']} {estudiante['apellido_materno']}".strip()
+                if estudiante['ultima_asistencia']:
+                    estudiante['ultima_asistencia'] = estudiante['ultima_asistencia'].strftime('%d/%m/%Y')
 
             return render_template('historial_asistencia.html',
-                                 registros=registros,
-                                 detalles_por_fecha=detalles_por_fecha,
-                                 clase_id=clase_id,
-                                 nombre_clase=nombre_clase)
+                                 clase=clase_info,
+                                 estudiantes=estudiantes,
+                                 stats={
+                                     'total_clases': clase_info['total_clases'] or 0,
+                                     'total_estudiantes': clase_info['total_estudiantes'] or 0,
+                                     'promedio_asistencia': clase_info['promedio_asistencia'] or 0
+                                 })
     
     except Error as e:
         print(f"Error en historial_asistencia: {e}")
@@ -1014,6 +1094,677 @@ def api_dashboard_stats():
     
     stats = ReportManager.get_dashboard_stats(profesor_filter)
     return jsonify(stats)
+
+# ---------- RUTAS ADMINISTRATIVAS ----------
+@bp.route('/admin')
+def admin():
+    """Panel principal de administración"""
+    print("DEBUG: Intentando acceder al panel de administración")
+    print(f"DEBUG: Session actual: {dict(session)}")
+    
+    if 'usuario' not in session:
+        print("DEBUG: No hay usuario en la sesión")
+        flash('Por favor inicie sesión', 'warning')
+        return redirect(url_for('main.login'))
+    
+    print(f"DEBUG: Usuario en sesión: {session.get('usuario')}")
+    print(f"DEBUG: Es admin?: {session.get('es_admin')}")
+    
+    try:
+        with get_db() as conexion:
+            cursor = conexion.cursor(dictionary=True)
+            
+            # Verificar si el usuario es realmente admin
+            cursor.execute("""
+                SELECT a.tipo_usuario, p.nombre
+                FROM autenticacion a
+                JOIN profesor p ON a.profesor_id = p.id
+                WHERE p.id = %s
+            """, (session.get('profesor_id'),))
+            
+            user_data = cursor.fetchone()
+            print(f"DEBUG: Datos del usuario desde DB: {user_data}")
+            
+            if user_data and user_data['tipo_usuario'] == 'admin':
+                # Estadísticas generales
+                cursor.execute("""
+                    SELECT 
+                        (SELECT COUNT(*) FROM profesor) as total_profesores,
+                        (SELECT COUNT(*) FROM alumno) as total_alumnos,
+                        (SELECT COUNT(*) FROM clase) as total_clases,
+                        (SELECT COUNT(*) FROM asistencia) as total_registros
+                """)
+                stats = cursor.fetchone()
+                
+                # Actividad reciente - Solo clases y profesores
+                cursor.execute("""
+                    SELECT 
+                        c.fecha, 
+                        c.nombre as clase_nombre, 
+                        s.codigo as seccion_codigo,
+                        p.nombre as profesor_nombre, 
+                        p.apellido_paterno as profesor_apellido,
+                        (SELECT COUNT(*) FROM alumno_clase ac WHERE ac.clase_id = c.id AND ac.estado = 'inscrito') as total_alumnos,
+                        (SELECT COUNT(*) FROM asistencia a WHERE a.clase_id = c.id AND a.presente = 1) as alumnos_presentes
+                    FROM clase c
+                    JOIN seccion s ON c.seccion_id = s.id
+                    JOIN profesor p ON c.profesor_id = p.id
+                    WHERE c.estado = 'activa'
+                    ORDER BY c.fecha DESC, c.hora_inicio DESC
+                    LIMIT 5
+                """)
+                actividad_reciente = cursor.fetchall()
+                
+                return render_template('admin/dashboard.html',
+                                     stats=stats,
+                                     actividad_reciente=actividad_reciente)
+            else:
+                flash('No tienes permisos de administrador', 'error')
+                return redirect(url_for('main.home'))
+    
+    except Exception as e:
+        print(f"ERROR: Error en el panel admin: {str(e)}")
+        flash(f'Error cargando el dashboard: {str(e)}', 'error')
+        return redirect(url_for('main.home'))
+
+@bp.route('/admin/clases', methods=['GET', 'POST'])
+@admin_required
+def admin_clases():
+    """Gestión de clases"""
+    try:
+        with get_db() as conexion:
+            cursor = conexion.cursor(dictionary=True)
+            
+            if request.method == 'POST':
+                accion = request.form.get('accion')
+                
+                if accion == 'crear':
+                    # Crear nueva clase
+                    cursor.execute("""
+                        INSERT INTO clase (nombre, seccion_id, periodo_academico_id, profesor_id, 
+                                        sala, fecha, hora_inicio, hora_fin)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (
+                        request.form['nombre'],
+                        request.form['seccion_id'],
+                        request.form['periodo_id'],
+                        request.form.get('profesor_id'),
+                        request.form['sala'],
+                        request.form['fecha'],
+                        request.form['hora_inicio'],
+                        request.form['hora_fin']
+                    ))
+                    conexion.commit()
+                    flash('Clase creada exitosamente', 'success')
+                
+                elif accion == 'editar':
+                    # Editar clase existente
+                    cursor.execute("""
+                        UPDATE clase 
+                        SET nombre = %s, seccion_id = %s, periodo_academico_id = %s,
+                            profesor_id = %s, sala = %s, fecha = %s,
+                            hora_inicio = %s, hora_fin = %s
+                        WHERE id = %s
+                    """, (
+                        request.form['nombre'],
+                        request.form['seccion_id'],
+                        request.form['periodo_id'],
+                        request.form.get('profesor_id'),
+                        request.form['sala'],
+                        request.form['fecha'],
+                        request.form['hora_inicio'],
+                        request.form['hora_fin'],
+                        request.form['clase_id']
+                    ))
+                    conexion.commit()
+                    flash('Clase actualizada exitosamente', 'success')
+                
+                elif accion == 'eliminar':
+                    # Eliminar clase
+                    cursor.execute("DELETE FROM clase WHERE id = %s", (request.form['clase_id'],))
+                    conexion.commit()
+                    flash('Clase eliminada exitosamente', 'success')
+            
+            # Obtener lista de clases
+            cursor.execute("""
+                SELECT c.*, s.codigo as seccion_codigo,
+                       p.nombre as profesor_nombre, p.apellido_paterno as profesor_apellido,
+                       pa.año, pa.semestre,
+                       COUNT(DISTINCT ac.alumno_id) as total_alumnos
+                FROM clase c
+                JOIN seccion s ON c.seccion_id = s.id
+                LEFT JOIN profesor p ON c.profesor_id = p.id
+                JOIN periodo_academico pa ON c.periodo_academico_id = pa.id
+                LEFT JOIN alumno_clase ac ON c.id = ac.clase_id
+                GROUP BY c.id
+                ORDER BY c.fecha DESC, c.hora_inicio
+            """)
+            clases = cursor.fetchall()
+            
+            # Obtener secciones y periodos para los formularios
+            cursor.execute("SELECT * FROM seccion ORDER BY codigo")
+            secciones = cursor.fetchall()
+            
+            cursor.execute("SELECT * FROM periodo_academico ORDER BY año DESC, semestre DESC")
+            periodos = cursor.fetchall()
+            
+            cursor.execute("SELECT id, nombre, apellido_paterno FROM profesor ORDER BY apellido_paterno, nombre")
+            profesores = cursor.fetchall()
+            
+            return render_template('admin/clases.html',
+                                 clases=clases,
+                                 secciones=secciones,
+                                 periodos=periodos,
+                                 profesores=profesores)
+    
+    except Exception as e:
+        flash(f'Error en la gestión de clases: {str(e)}', 'error')
+        return redirect(url_for('main.admin'))
+
+@bp.route('/admin/alumnos', methods=['GET', 'POST'])
+@admin_required
+def admin_alumnos():
+    """Gestión de alumnos"""
+    try:
+        with get_db() as conexion:
+            cursor = conexion.cursor(dictionary=True)
+            
+            if request.method == 'POST':
+                accion = request.form.get('accion')
+                
+                if accion == 'crear':
+                    # Crear nuevo alumno
+                    cursor.execute("""
+                        INSERT INTO alumno (nombre, apellido_paterno, apellido_materno, rut, email)
+                        VALUES (%s, %s, %s, %s, %s)
+                    """, (
+                        request.form['nombre'],
+                        request.form['apellido_paterno'],
+                        request.form['apellido_materno'],
+                        request.form['rut'],
+                        request.form['email']
+                    ))
+                    conexion.commit()
+                    flash('Alumno creado exitosamente', 'success')
+                
+                elif accion == 'editar':
+                    # Editar alumno existente
+                    cursor.execute("""
+                        UPDATE alumno 
+                        SET nombre = %s, apellido_paterno = %s, apellido_materno = %s,
+                            rut = %s, email = %s
+                        WHERE id = %s
+                    """, (
+                        request.form['nombre'],
+                        request.form['apellido_paterno'],
+                        request.form['apellido_materno'],
+                        request.form['rut'],
+                        request.form['email'],
+                        request.form['alumno_id']
+                    ))
+                    conexion.commit()
+                    flash('Alumno actualizado exitosamente', 'success')
+                
+                elif accion == 'eliminar':
+                    # Eliminar alumno
+                    cursor.execute("DELETE FROM alumno WHERE id = %s", (request.form['alumno_id'],))
+                    conexion.commit()
+                    flash('Alumno eliminado exitosamente', 'success')
+            
+            # Obtener lista de alumnos
+            cursor.execute("""
+                SELECT a.*, 
+                       GROUP_CONCAT(DISTINCT CONCAT(c.nombre, ' (', s.codigo, ')') SEPARATOR ', ') as clases,
+                       COUNT(DISTINCT ac.clase_id) as total_clases
+                FROM alumno a
+                LEFT JOIN alumno_clase ac ON a.id = ac.alumno_id
+                LEFT JOIN clase c ON ac.clase_id = c.id
+                LEFT JOIN seccion s ON c.seccion_id = s.id
+                GROUP BY a.id
+                ORDER BY a.apellido_paterno, a.nombre
+            """)
+            alumnos = cursor.fetchall()
+            
+            return render_template('admin/alumnos.html',
+                                 alumnos=alumnos)
+    
+    except Exception as e:
+        flash(f'Error en la gestión de alumnos: {str(e)}', 'error')
+        return redirect(url_for('main.admin'))
+
+@bp.route('/admin/profesores', methods=['GET', 'POST'])
+@admin_required
+def admin_profesores():
+    """Gestión de profesores"""
+    try:
+        with get_db() as conexion:
+            cursor = conexion.cursor(dictionary=True)
+            
+            if request.method == 'POST':
+                accion = request.form.get('accion')
+                
+                if accion == 'crear':
+                    # Crear nuevo profesor y usuario
+                    cursor.execute("""
+                        INSERT INTO usuario (username, password, activo)
+                        VALUES (%s, %s, 1)
+                    """, (
+                        request.form['username'],
+                        generate_password_hash(request.form['password'])
+                    ))
+                    usuario_id = cursor.lastrowid
+                    
+                    cursor.execute("""
+                        INSERT INTO profesor (usuario_id, nombre, apellido_paterno, apellido_materno, 
+                                           rut, email)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    """, (
+                        usuario_id,
+                        request.form['nombre'],
+                        request.form['apellido_paterno'],
+                        request.form['apellido_materno'],
+                        request.form['rut'],
+                        request.form['email']
+                    ))
+                    profesor_id = cursor.lastrowid
+                    
+                    # Asignar roles
+                    if 'roles' in request.form:
+                        rol_ids = request.form.getlist('roles')
+                        for rol_id in rol_ids:
+                            cursor.execute("""
+                                INSERT INTO usuario_rol (usuario_id, rol_id)
+                                VALUES (%s, %s)
+                            """, (usuario_id, rol_id))
+                    
+                    conexion.commit()
+                    flash('Profesor creado exitosamente', 'success')
+                
+                elif accion == 'editar':
+                    # Editar profesor existente
+                    cursor.execute("""
+                        UPDATE profesor 
+                        SET nombre = %s, apellido_paterno = %s, apellido_materno = %s,
+                            rut = %s, email = %s
+                        WHERE id = %s
+                    """, (
+                        request.form['nombre'],
+                        request.form['apellido_paterno'],
+                        request.form['apellido_materno'],
+                        request.form['rut'],
+                        request.form['email'],
+                        request.form['profesor_id']
+                    ))
+                    
+                    # Actualizar roles si se proporcionaron
+                    if 'roles' in request.form:
+                        cursor.execute("SELECT usuario_id FROM profesor WHERE id = %s", 
+                                     (request.form['profesor_id'],))
+                        usuario_id = cursor.fetchone()['usuario_id']
+                        
+                        # Eliminar roles actuales
+                        cursor.execute("DELETE FROM usuario_rol WHERE usuario_id = %s", (usuario_id,))
+                        
+                        # Asignar nuevos roles
+                        rol_ids = request.form.getlist('roles')
+                        for rol_id in rol_ids:
+                            cursor.execute("""
+                                INSERT INTO usuario_rol (usuario_id, rol_id)
+                                VALUES (%s, %s)
+                            """, (usuario_id, rol_id))
+                    
+                    conexion.commit()
+                    flash('Profesor actualizado exitosamente', 'success')
+                
+                elif accion == 'eliminar':
+                    # Eliminar profesor y usuario asociado
+                    cursor.execute("SELECT usuario_id FROM profesor WHERE id = %s", 
+                                 (request.form['profesor_id'],))
+                    usuario_id = cursor.fetchone()['usuario_id']
+                    
+                    cursor.execute("DELETE FROM profesor WHERE id = %s", (request.form['profesor_id'],))
+                    cursor.execute("DELETE FROM usuario WHERE id = %s", (usuario_id,))
+                    conexion.commit()
+                    flash('Profesor eliminado exitosamente', 'success')
+            
+            # Obtener lista de profesores
+            cursor.execute("""
+                SELECT p.*, u.username,
+                       GROUP_CONCAT(DISTINCT r.nombre ORDER BY r.nombre SEPARATOR ',') as roles,
+                       COUNT(DISTINCT c.id) as total_clases
+                FROM profesor p
+                JOIN usuario u ON p.usuario_id = u.id
+                LEFT JOIN usuario_rol ur ON u.id = ur.usuario_id
+                LEFT JOIN rol r ON ur.rol_id = r.id
+                LEFT JOIN clase c ON p.id = c.profesor_id
+                GROUP BY p.id
+                ORDER BY p.apellido_paterno, p.nombre
+            """)
+            profesores = cursor.fetchall()
+            
+            # Obtener roles para el formulario
+            cursor.execute("SELECT * FROM rol ORDER BY nombre")
+            roles = cursor.fetchall()
+            
+            return render_template('admin/profesores.html',
+                                 profesores=profesores,
+                                 roles=roles)
+    
+    except Exception as e:
+        flash(f'Error en la gestión de profesores: {str(e)}', 'error')
+        return redirect(url_for('main.admin'))
+
+@bp.route('/admin/asistencia', methods=['GET', 'POST'])
+@admin_required
+def admin_asistencia():
+    """Gestión de asistencia"""
+    try:
+        with get_db() as conexion:
+            cursor = conexion.cursor(dictionary=True)
+            
+            if request.method == 'POST':
+                accion = request.form.get('accion')
+                
+                if accion == 'registrar':
+                    # Registrar nueva asistencia
+                    cursor.execute("""
+                        INSERT INTO asistencia (clase_id, fecha, hora_inicio, hora_fin)
+                        VALUES (%s, %s, %s, %s)
+                    """, (
+                        request.form['clase_id'],
+                        request.form['fecha'],
+                        request.form['hora_inicio'],
+                        request.form['hora_fin']
+                    ))
+                    asistencia_id = cursor.lastrowid
+                    
+                    # Registrar alumnos presentes
+                    if 'alumnos_presentes' in request.form:
+                        alumno_ids = request.form.getlist('alumnos_presentes')
+                        for alumno_id in alumno_ids:
+                            cursor.execute("""
+                                INSERT INTO alumno_asistencia (alumno_id, asistencia_id)
+                                VALUES (%s, %s)
+                            """, (alumno_id, asistencia_id))
+                    
+                    conexion.commit()
+                    flash('Asistencia registrada exitosamente', 'success')
+                
+                elif accion == 'editar':
+                    # Editar registro de asistencia
+                    cursor.execute("""
+                        UPDATE asistencia 
+                        SET fecha = %s, hora_inicio = %s, hora_fin = %s
+                        WHERE id = %s
+                    """, (
+                        request.form['fecha'],
+                        request.form['hora_inicio'],
+                        request.form['hora_fin'],
+                        request.form['asistencia_id']
+                    ))
+                    
+                    # Actualizar alumnos presentes
+                    cursor.execute("DELETE FROM alumno_asistencia WHERE asistencia_id = %s", 
+                                 (request.form['asistencia_id'],))
+                    
+                    if 'alumnos_presentes' in request.form:
+                        alumno_ids = request.form.getlist('alumnos_presentes')
+                        for alumno_id in alumno_ids:
+                            cursor.execute("""
+                                INSERT INTO alumno_asistencia (alumno_id, asistencia_id)
+                                VALUES (%s, %s)
+                            """, (alumno_id, request.form['asistencia_id']))
+                    
+                    conexion.commit()
+                    flash('Asistencia actualizada exitosamente', 'success')
+                
+                elif accion == 'eliminar':
+                    # Eliminar registro de asistencia
+                    cursor.execute("DELETE FROM asistencia WHERE id = %s", 
+                                 (request.form['asistencia_id'],))
+                    conexion.commit()
+                    flash('Registro de asistencia eliminado exitosamente', 'success')
+            
+            # Aplicar filtros si existen
+            where_clauses = []
+            params = []
+            
+            if request.args.get('clase_id'):
+                where_clauses.append("a.clase_id = %s")
+                params.append(request.args.get('clase_id'))
+            
+            if request.args.get('profesor_id'):
+                where_clauses.append("c.profesor_id = %s")
+                params.append(request.args.get('profesor_id'))
+            
+            if request.args.get('fecha_desde'):
+                where_clauses.append("a.fecha >= %s")
+                params.append(request.args.get('fecha_desde'))
+            
+            if request.args.get('fecha_hasta'):
+                where_clauses.append("a.fecha <= %s")
+                params.append(request.args.get('fecha_hasta'))
+            
+            where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
+            
+            # Obtener lista de asistencias
+            cursor.execute(f"""
+                SELECT a.*, c.nombre as clase_nombre, s.codigo as seccion_codigo,
+                       p.nombre as profesor_nombre, p.apellido_paterno as profesor_apellido,
+                       COUNT(DISTINCT aa.alumno_id) as alumnos_presentes,
+                       (SELECT COUNT(*) FROM alumno_clase ac WHERE ac.clase_id = c.id) as total_alumnos,
+                       CASE 
+                           WHEN a.fecha > CURDATE() THEN 'Pendiente'
+                           WHEN a.fecha = CURDATE() AND a.hora_fin > CURRENT_TIME() THEN 'En Curso'
+                           ELSE 'Completada'
+                       END as estado
+                FROM asistencia a
+                JOIN clase c ON a.clase_id = c.id
+                JOIN seccion s ON c.seccion_id = s.id
+                JOIN profesor p ON c.profesor_id = p.id
+                LEFT JOIN alumno_asistencia aa ON a.id = aa.asistencia_id
+                WHERE {where_sql}
+                GROUP BY a.id
+                ORDER BY a.fecha DESC, a.hora_inicio DESC
+            """, params)
+            asistencias = cursor.fetchall()
+            
+            # Obtener clases y profesores para los filtros
+            cursor.execute("""
+                SELECT c.id, c.nombre, s.codigo as seccion_codigo
+                FROM clase c
+                JOIN seccion s ON c.seccion_id = s.id
+                ORDER BY c.fecha DESC
+            """)
+            clases = cursor.fetchall()
+            
+            cursor.execute("""
+                SELECT id, nombre, apellido_paterno
+                FROM profesor
+                ORDER BY apellido_paterno, nombre
+            """)
+            profesores = cursor.fetchall()
+            
+            return render_template('admin/asistencia.html',
+                                 asistencias=asistencias,
+                                 clases=clases,
+                                 profesores=profesores)
+    
+    except Exception as e:
+        flash(f'Error en la gestión de asistencia: {str(e)}', 'error')
+        return redirect(url_for('main.admin'))
+
+@bp.route('/api/alumnos_clase/<int:clase_id>')
+@admin_required
+def api_alumnos_clase(clase_id):
+    """API para obtener los alumnos de una clase"""
+    try:
+        with get_db() as conexion:
+            cursor = conexion.cursor(dictionary=True)
+            
+            cursor.execute("""
+                SELECT a.id, a.nombre, a.apellido_paterno
+                FROM alumno a
+                JOIN alumno_clase ac ON a.id = ac.alumno_id
+                WHERE ac.clase_id = %s
+                ORDER BY a.apellido_paterno, a.nombre
+            """, (clase_id,))
+            alumnos = cursor.fetchall()
+            
+            return jsonify(alumnos)
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/reconocer_alumno', methods=['POST'])
+@require_login
+def reconocer_alumno():
+    """
+    Endpoint para reconocer un alumno mediante reconocimiento facial
+    """
+    if not request.is_json:
+        return jsonify({'success': False, 'message': 'Se requiere JSON'}), 400
+
+    data = request.get_json()
+    image_data = data.get('image_data')
+    clase_id = data.get('clase_id')
+
+    if not image_data or not clase_id:
+        return jsonify({'success': False, 'message': 'Faltan datos requeridos'}), 400
+
+    try:
+        # Intentar reconocer al alumno
+        alumno_id = facial_recognition.recognize_face(image_data)
+        
+        if alumno_id:
+            # Verificar si el alumno está en la clase
+            alumno = Alumno.query.get(alumno_id)
+            if alumno and alumno in get_alumnos_clase(clase_id):
+                return jsonify({
+                    'success': True,
+                    'alumno_id': alumno_id,
+                    'message': f'Alumno reconocido: {alumno.nombre} {alumno.apellido_paterno}'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': 'Alumno no pertenece a esta clase'
+                })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'No se reconoció ningún alumno'
+            })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Error en el reconocimiento facial: {str(e)}'
+        }), 500
+
+@bp.route('/marcar_asistencia', methods=['POST'])
+@require_login
+def marcar_asistencia():
+    """
+    Endpoint para marcar la asistencia de un alumno
+    """
+    if not request.is_json:
+        return jsonify({'success': False, 'message': 'Se requiere JSON'}), 400
+
+    data = request.get_json()
+    alumno_id = data.get('alumno_id')
+    clase_id = data.get('clase_id')
+
+    if not alumno_id or not clase_id:
+        return jsonify({'success': False, 'message': 'Faltan datos requeridos'}), 400
+
+    try:
+        # Marcar asistencia
+        asistencia = Asistencia.query.filter_by(
+            alumno_id=alumno_id,
+            clase_id=clase_id,
+            fecha=datetime.now().date()
+        ).first()
+
+        if not asistencia:
+            asistencia = Asistencia(
+                alumno_id=alumno_id,
+                clase_id=clase_id,
+                fecha=datetime.now().date(),
+                hora=datetime.now().time(),
+                presente=True
+            )
+            db.session.add(asistencia)
+        else:
+            asistencia.presente = True
+            asistencia.hora = datetime.now().time()
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Asistencia registrada correctamente'
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': f'Error al registrar asistencia: {str(e)}'
+        }), 500
+
+@bp.route('/registrar_imagen_alumno', methods=['POST'])
+@require_login
+def registrar_imagen_alumno():
+    """
+    Endpoint para registrar la imagen de referencia de un alumno
+    """
+    if not request.is_json:
+        return jsonify({'success': False, 'message': 'Se requiere JSON'}), 400
+
+    data = request.get_json()
+    image_data = data.get('image_data')
+    alumno_id = data.get('alumno_id')
+
+    if not image_data or not alumno_id:
+        return jsonify({'success': False, 'message': 'Faltan datos requeridos'}), 400
+
+    try:
+        # Verificar que el alumno existe
+        alumno = Alumno.query.get_or_404(alumno_id)
+
+        # Registrar la imagen en el sistema de reconocimiento facial
+        success = facial_recognition.add_face(image_data, str(alumno_id))
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Imagen registrada correctamente'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'No se detectó una cara clara en la imagen'
+            })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Error al registrar imagen: {str(e)}'
+        }), 500
+
+@bp.route('/registro_imagen/<int:alumno_id>')
+@require_login
+def registro_imagen(alumno_id):
+    """
+    Vista para registrar la imagen de un alumno
+    """
+    try:
+        alumno = Alumno.query.get_or_404(alumno_id)
+        return render_template('registro_imagen.html', alumno=alumno)
+    except Exception as e:
+        flash('Error al cargar la página de registro de imagen', 'error')
+        return redirect(url_for('main.dashboard'))
 
 
 

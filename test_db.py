@@ -157,21 +157,21 @@ def crear_datos_prueba():
             print("🏫 Creando clases...")
             fecha_base = date.today() - timedelta(days=30)
             clases = [
-                ('Programación Web Avanzada', 1, fecha_base, '08:00:00', '09:30:00', 'A301', 'presencial', 1),
-                ('Programación Web Avanzada', 2, fecha_base + timedelta(days=2), '10:00:00', '11:30:00', 'A302', 'presencial', 1),
-                ('Base de Datos II', 1, fecha_base + timedelta(days=1), '14:00:00', '15:30:00', 'B201', 'presencial', 1),
-                ('Desarrollo Móvil', 3, fecha_base + timedelta(days=3), '16:00:00', '17:30:00', 'C101', 'hibrida', 1),
-                ('Redes y Comunicaciones', 4, fecha_base + timedelta(days=4), '09:00:00', '10:30:00', 'D401', 'presencial', 1),
+                ('Programación Web Avanzada', 1, fecha_base, '08:00:00', '09:30:00', 'A301', 'presencial', 1, 1),
+                ('Programación Web Avanzada', 2, fecha_base + timedelta(days=2), '10:00:00', '11:30:00', 'A302', 'presencial', 1, 1),
+                ('Base de Datos II', 1, fecha_base + timedelta(days=1), '14:00:00', '15:30:00', 'B201', 'presencial', 1, 2),
+                ('Desarrollo Móvil', 3, fecha_base + timedelta(days=3), '16:00:00', '17:30:00', 'C101', 'hibrida', 1, 1),
+                ('Redes y Comunicaciones', 4, fecha_base + timedelta(days=4), '09:00:00', '10:30:00', 'D401', 'presencial', 1, 2),
                 # Clases para la semana siguiente
-                ('Programación Web Avanzada', 1, fecha_base + timedelta(days=7), '08:00:00', '09:30:00', 'A301', 'presencial', 1),
-                ('Base de Datos II', 1, fecha_base + timedelta(days=8), '14:00:00', '15:30:00', 'B201', 'presencial', 1),
+                ('Programación Web Avanzada', 1, fecha_base + timedelta(days=7), '08:00:00', '09:30:00', 'A301', 'presencial', 1, 1),
+                ('Base de Datos II', 1, fecha_base + timedelta(days=8), '14:00:00', '15:30:00', 'B201', 'presencial', 1, 2),
             ]
             
-            for nombre, seccion_id, fecha, hora_i, hora_f, sala, modalidad, periodo_id in clases:
+            for nombre, seccion_id, fecha, hora_i, hora_f, sala, modalidad, periodo_id, profesor_id in clases:
                 cursor.execute("""
-                    INSERT INTO clase (nombre, seccion_id, fecha, hora_inicio, hora_fin, sala, modalidad, periodo_academico_id)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                """, (nombre, seccion_id, fecha, hora_i, hora_f, sala, modalidad, periodo_id))
+                    INSERT INTO clase (nombre, seccion_id, fecha, hora_inicio, hora_fin, sala, modalidad, periodo_academico_id, profesor_id)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (nombre, seccion_id, fecha, hora_i, hora_f, sala, modalidad, periodo_id, profesor_id))
             
             # 10. RELACIONES PROFESOR-CLASE
             print("👨‍🏫 Asignando profesores a clases...")
