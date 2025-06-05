@@ -1,0 +1,282 @@
+# ===================================
+# .gitignore para Sistema de Asistencia DuocUC
+# Proyecto Flask con MySQL y Entorno Virtual
+# ===================================
+
+# ===== ENTORNO VIRTUAL =====
+# Excluir todas las carpetas del entorno virtual
+Lib/
+Scripts/
+Include/
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+pyvenv.cfg
+
+# ===== ARCHIVOS DE PYTHON =====
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Translations
+*.mo
+*.pot
+
+# ===== FLASK ESPECÍFICO =====
+# Flask instance folder
+instance/
+.webassets-cache
+
+# ===== ARCHIVOS DE CONFIGURACIÓN SENSIBLES =====
+# Variables de entorno y configuración
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+
+# Archivos de configuración con datos sensibles
+config_local.py
+local_settings.py
+
+# ===== BASE DE DATOS =====
+# Archivos de base de datos SQLite (si se usan)
+*.db
+*.sqlite
+*.sqlite3
+
+# Dumps de base de datos
+*.sql
+database_backup/
+backups/
+
+# ===== LOGS =====
+# Archivos de log
+*.log
+logs/
+log/
+
+# ===== ARCHIVOS DE DESARROLLO =====
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# poetry
+poetry.lock
+
+# celery beat schedule file
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# ===== SISTEMAS OPERATIVOS =====
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ===== EDITORES E IDEs =====
+# Visual Studio Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+.history/
+*.vsix
+
+# PyCharm
+.idea/
+*.swp
+*.swo
+*~
+
+# Sublime Text
+*.tmlanguage.cache
+*.tmPreferences.cache
+*.stTheme.cache
+*.sublime-workspace
+*.sublime-project
+
+# Vim
+[._]*.s[a-v][a-z]
+!*.svg
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# ===== ARCHIVOS DE MEDIOS Y UPLOADS =====
+# Archivos subidos por usuarios
+uploads/
+media/
+static/uploads/
+app/static/uploads/
+
+# Archivos temporales de imágenes
+*.tmp
+temp/
+tmp/
+
+# ===== CERTIFICADOS Y CLAVES =====
+# Certificados SSL
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+
+# Claves SSH
+id_rsa
+id_rsa.pub
+id_dsa
+id_dsa.pub
+id_ecdsa
+id_ecdsa.pub
+id_ed25519
+id_ed25519.pub
+
+# ===== OTROS =====
+# Archivos de respaldo
+*.bak
+*.backup
+*.orig
+
+# Archivos comprimidos
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# Documentación generada
+docs/_build/
+
+# ===== ESPECÍFICO DEL PROYECTO =====
+# Datos de reconocimiento facial (pueden ser grandes)
+face_data/
+facial_recognition_models/
+
+# Reportes generados
+reports/
+generated_reports/
+
+# Archivos de migración temporal
+migration_backup/
+
+# Archivos de prueba
+test_images/
+sample_data/ 
